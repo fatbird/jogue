@@ -2,7 +2,7 @@ function Square(options)
 {
     this.x = options.x;
     this.y = options.y;
-    this.visibility = 3;
+    this.visibility = 0;
     this.entity = options.entity || wall;
     this.level = options.level;
     this._span = undefined;
@@ -62,6 +62,14 @@ Square.prototype.span = function() {
         this._span.className = this._classes.join(" ");
     }
     return this._span;
+};
+
+Square.prototype.updateVisibility = function(level) {
+    if (level > this.visibility) {
+        this.removeClass(this.lighting[this.visibility]);
+        this.visibility = level;
+        this.addClass(this.lighting[this.visibility]);
+    }
 };
 
 Square.prototype.addClass = function(cls) {
@@ -193,16 +201,18 @@ Level.prototype.getRoomParameters = function() {
 
 Level.prototype.generateLevel = function() {
     this.entry = this.grid[this.start.x][this.start.y];
-    var params = this.getRoomParameters();
+    var params = this.getRoomParameters(),
+        max_attempts = 60,
+        max_rooms = 15,
+        num_rooms = 1;
     this.addRoom(this.entry, params.dir, params.lat, params.lng);
-    for (var ii = 0; ii < 4; ++ii) {
+    for (var ii = 0; ii < max_attempts && num_rooms < max_rooms; ++ii) {
         var keys = Object.keys(this.available),
             available = this.available[keys[this.random(0, keys.length)]],
             door = available.wall,
             dir = available.dir;
         params = this.getRoomParameters();
-        if (! door.markAvailableWalls(dir)) { --ii; continue; }
-        //if (! this.addRoom(door, dir, params.lat, params.lng)) { break; }
+        if (this.addRoom(door, dir, params.lat, params.lng)) { ++num_rooms; }
     }
     this.entry = this.grid[this.entry.x][this.entry.y];
     this.entry.add(up);
@@ -211,24 +221,24 @@ Level.prototype.generateLevel = function() {
     this.exit.add(down);
 };
 
-/**
- * The meat of dungeon generation: this algorithm finds an available wall, adds
- * a door to it, then tries to carve out a room at least min height and width
- * and at most max height and width.  The direction in which the carver is
- * facing (i.e., in which wall of the existing room the door is) is the
- * longitudinal axis of the new room (lng* variables, below; lat* are lateral
- * equivalents).  The carver digs laterally to max_lat, randomly alternating
- * between left and right for the first row, and then advances along the
- * longitudinal axis and and carves laterally to the left/right boundaries
- * established in the first row.
- *
- * If at any time, the carver cannot continue because the possible square
- * doesn't have wall in the next square laterally and longitudinally, room
- * generation stops and min_* values are checked.  If the room is big enough,
- * it's committed; otherwise it's abandoned.
- */
-
 Level.prototype.addRoom = function(door, dir, lat, lng) {
+    /**
+     * The meat of dungeon generation: this algorithm finds an available wall,
+     * adds a door to it, then tries to carve out a room at least min height
+     * and width and at most max height and width.  The direction in which the
+     * carver is facing (i.e., in which wall of the existing room the door is)
+     * is the longitudinal axis of the new room (lng* variables, below; lat*
+     * are lateral equivalents).  The carver digs laterally to max_lat,
+     * randomly alternating between left and right for the first row, and then
+     * advances along the longitudinal axis and and carves laterally to the
+     * left/right boundaries established in the first row.
+     *
+     * If at any time, the carver cannot continue because the possible square
+     * doesn't have wall in the next square laterally and longitudinally, room
+     * generation stops and min_* values are checked.  If the room is big
+     * enough, it's committed; otherwise it's abandoned.
+     */
+
     var lat_choices = (dir === "n" || dir === "s" ? ["w", "e"] : ["n", "s"]),
         choices = lat_choices.slice(),
         lng_choices = (dir === "n" || dir === "s" ? ["n", "s"] : ["w", "e"]),
@@ -298,18 +308,6 @@ Level.prototype.addRoom = function(door, dir, lat, lng) {
     return true;
 };
 
-Level.prototype.getAvailableWalls = function () {
-    var available = [];
-    for (var xx = 1; xx < this.width - 1; ++xx) {
-        for (var yy = 1; yy < this.height - 1; ++yy) {
-            if (this.grid[xx][yy].entity != wall) { continue; }
-            var adj = this.grid[xx][yy].getOpenAdjacent();
-            if (adj.length === 1) { available.push({x: xx, y: yy, dir: adj[0].dir}); }
-        }
-    }
-    return available;
-};
-
 Level.prototype.set = function(square) {
     var old = this.grid[square.x][square.y].span();
     this.grid[square.x][square.y] = square;
@@ -328,6 +326,31 @@ Level.prototype.isAllowed = function(position) {
     if (position.x < 0 || position.x >= this.width) { return false; }
     if (position.y < 0 || position.y >= this.height) { return false; }
     return position.entity !== wall;
+};
+
+
+var visibility_grid = [
+    [[1, 2], [2], [1, 2]],
+    [[2], [], [2]],
+    [[1, 2], [2], [1, 2]],
+];
+Level.prototype.updateVisibility = function(square) {
+    var x = square.x, y = square.y;
+    for (var yy = -1; yy <= 1; ++yy) {
+        for (var xx = -1; xx <= 1; ++xx) {
+            if (! this.grid[x + xx]) { continue; }
+            if (! this.grid[x + xx][y + yy]) { continue; }
+            this.grid[x + xx][y + yy].updateVisibility(3);
+            if (this.grid[x + xx][y + yy].entity != wall) {
+                var xtd = visibility_grid[xx + 1][yy + 1];
+                this.grid[x + xx + xx][y + yy + yy].updateVisibility(xtd[0]);
+                if (xtd.length > 1) {
+                    this.grid[x + xx + xx][y + yy].updateVisibility(xtd[1]);
+                    this.grid[x + xx][y + yy + yy].updateVisibility(xtd[1]);
+                }
+            }
+        }
+    }
 };
 
 
@@ -382,7 +405,7 @@ Dungeon.prototype.move = function(direction)
         this.hero.square.remove(this.hero.entity);
         this.hero.square = new_position;
         this.hero.square.add(this.hero.entity);
-        //update_visibility(cursor);
+        this.currentLevel.updateVisibility(this.hero.square);
     }
     this.monitor.refresh();
 };
@@ -415,6 +438,7 @@ Dungeon.prototype.exit = function() {
     this.hero.square = this.currentLevel.grid[this.currentLevel[loc].x]
                                              [this.currentLevel[loc].y];
     this.hero.square.add(this.hero.entity);
+    this.currentLevel.updateVisibility(this.hero.square);
 };
 
 function Screen(options)
@@ -449,6 +473,7 @@ function Monitor(options)
                  square: this.dungeon.currentLevel.grid[Math.floor(this.width / 2)]
                                                        [Math.floor(this.height / 2)]};
     this.hero.square.add(this.hero.entity);
+    this.dungeon.currentLevel.updateVisibility(this.hero.square);
 
     this.status_bar = document.createElement("div");
     this.element.appendChild(this.status_bar);
