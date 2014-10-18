@@ -7,5 +7,5 @@ var ihero = ['\u00a1', 'hero'],
 
     up    = ['\u2191', ['stairs']],
     down  = ['\u2193', ['stairs']],
-    wall  = ['\u2588', ['wall']],
-    floor = ['\u00b7', ['floor']];
+    wall  = [' ', ['wall']],
+    floor = ['\u203b', ['floor']];

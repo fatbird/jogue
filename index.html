@@ -1,39 +1,13 @@
 <html>
 <head>
 <title>IBRL</title>
-<style>
-body {
-  background: black;
-  font: normal 14pt "Source Code Pro";
-  font-weight: 300;
-  line-height: 105%;
-  color: #333;
-}
-div#monitor {
-  display: inline-block;
-  padding: 0.5em;
-  white-space: pre;
-}
-.wall { color: #666; font-weight: bold; }
-.text { color: #666; }
-.data { color: #999; font-weight: bold; }
-.status { color: #666; }
-.monster { color: #990000; }
-.floor { color: #333; }
-.stairs { color: #CC9; }
-.hero { color: #FFFFCC; font-weight: bold; }
-
-.pitch { opacity: 0; }
-.dark { opacity: 0.40; }
-.dim { opacity: 0.7; }
-.visible { opacity: 1; }
-.blue { color: blue; }
-.available { color: red; }
-</style>
+<link rel="stylesheet" type="text/css" href="default.css">
+<link href='http://fonts.googleapis.com/css?family=Source+Code+Pro:200,300,400,500,600,700,900&subset=latin,latin-ext' rel='stylesheet' type='text/css'>
 </head>
 <body onload="init();">
-<div id="monitor"></div>
-<script lang="javascript" src="glyphs.js"></script>
+<div id="context"></div>
+<script lang="javascript" src="entities.js"></script>
+<script lang="javascript" src="context.js"></script>
 <script lang="javascript" src="jogue.js"></script>
 </body>
 </html>

@@ -6,7 +6,7 @@ function Square(options)
     this.entity = options.entity || wall;
     this.level = options.level;
     this._span = undefined;
-    this._classes = this.entity[1].slice() || [];
+    this._classes = ['grid'].concat(this.entity[1] || []);
 }
 
 Square.prototype.add = function(entity) {
@@ -148,20 +148,20 @@ function Level(options)
     this.available = {};
     this.open = [];
 
-    var total = options.height * options.width, y = 0;
-    for (var ii = 0; ii < total; ++ii) {
-        if (ii < options.width) { this.grid[ii] = []; }
-        var x = ii % options.width;
-        this.grid[x].push(new Square({x: x, y: y, entity: wall, level: this}));
-        this.element.appendChild(this.grid[x][y].span());
-        if (x + 1 === this.width) {
-            this.element.appendChild(document.createElement("br"));
-            ++y;
+    var xx, yy, row;
+    for (yy = 0; yy < this.height; ++yy) {
+        row = document.createElement("div");
+        row.className = "row";
+        for (xx = 0; xx < this.width; ++xx) {
+            if (! this.grid[xx]) { this.grid[xx] = []; }
+            this.grid[xx].push(new Square({x: xx, y: yy, level: this}));
+            row.appendChild(this.grid[xx][yy].span());
         }
+        this.element.appendChild(row);
     }
     // Give each square a cardinal direction reference to its neighbours
-    for (var xx = 0; xx < this.width; ++xx) {
-        for (var yy = 0; yy < this.height; ++yy) {
+    for (xx = 0; xx < this.width; ++xx) {
+        for (yy = 0; yy < this.height; ++yy) {
             for (var dir in Square.prototype.cardinals) {
                 try {
                     var nx = xx + Square.prototype.cardinals[dir][0],
@@ -259,8 +259,9 @@ Level.prototype.addRoom = function(door, dir, lat, lng) {
 
     for (ii = 0; ii < lat.max - 1 && choices.length > 0; ++ii) {
         var cdir = this.choice.apply(this, choices),
-            latp = room[cdir][cdir];
-        if (latp.isOkForRoom(dir, cdir, rdir)) {
+            latp = room[cdir][cdir],
+            cpdir = ["n", "s"].indexOf(dir) > -1 ? dir + cdir : cdir + dir;
+        if (latp.isOkForRoom(dir, cdir, rdir, cpdir)) {
             room[cdir] = latp;
             room[dir + cdir] = latp;
         } else {
@@ -270,11 +271,22 @@ Level.prototype.addRoom = function(door, dir, lat, lng) {
     var width = room[lat_choices[1]][lat_axis] - room[lat_choices[0]][lat_axis];
     if (width + 1 < lat.min) { return false; }
     loop: for (kk = 1; kk < lng.max; ++kk) {
-        var cdir = lat_choices[1];    // jshint ignore:line
+        var cdir = lat_choices[1],   // jshint ignore:line
+            dirs = [dir, cdir];
         if (room[lat_choices[0]][dir].isOkForRoom(dir, cdir, lat_choices[0])) {
+            if (["n", "s"].indexOf(dir) > -1) {
+                dirs.push(dir + lat_choices[0]);
+                dirs.push(dir + lat_choices[1]);
+            } else {
+                dirs.push(lat_choices[0] + dir);
+                dirs.push(lat_choices[1] + dir);
+            }
+            var xdir = ["n", "s"].indexOf(dir) > -1 ? dir + cdir : cdir + dir;
             room[cdir] = room[lat_choices[0]] = room[lat_choices[0]][dir];
             for (ii = 0; ii < width; ++ii) {
-                if (! room[cdir][cdir].isOkForRoom(dir, cdir)) { break loop; }
+                if (! room[cdir][cdir].isOkForRoom.apply(dirs)) {
+                    break loop;
+                }
                 room[cdir] = room[cdir][cdir];
             }
             room[nw] = room[ldir];
@@ -311,7 +323,7 @@ Level.prototype.addRoom = function(door, dir, lat, lng) {
 Level.prototype.set = function(square) {
     var old = this.grid[square.x][square.y].span();
     this.grid[square.x][square.y] = square;
-    this.element.replaceChild(square.span(), old);
+    this.element.children[square.y].replaceChild(square.span(), old);
     for (var dir in Square.prototype.cardinals) {
         try {
             var nx = square.x + Square.prototype.cardinals[dir][0],
@@ -361,8 +373,8 @@ function Dungeon(options)
     this.levels = [];
     this.currentLevel = undefined;
     this.levelIndex = undefined;
-    this.monitor = options.monitor;
-    this.hero = this.monitor.hero;
+    this.context = options.context;
+    this.hero = this.context.hero;
 }
 
 Dungeon.prototype.addLevel = function(start, parent) {
@@ -383,7 +395,7 @@ Dungeon.prototype.addLevel = function(start, parent) {
 var LEFT = 0, UP = 1, RIGHT = 2, DOWN = 3, X = 0, Y = 1;
 Dungeon.prototype.move = function(direction)
 {
-    if (this.hero === undefined) { this.hero = this.monitor.hero; }
+    if (this.hero === undefined) { this.hero = this.context.hero; }
     var new_position = {x: this.hero.square.x, y: this.hero.square.y};
     allowed = false;
     switch(direction) {
@@ -407,11 +419,11 @@ Dungeon.prototype.move = function(direction)
         this.hero.square.add(this.hero.entity);
         this.currentLevel.updateVisibility(this.hero.square);
     }
-    this.monitor.refresh();
+    this.context.refresh();
 };
 
 Dungeon.prototype.exit = function() {
-    if (! this.hero) { this.hero = this.monitor.hero; }
+    if (! this.hero) { this.hero = this.context.hero; }
     var loc = "entry";
     if (this.hero.square.x === this.currentLevel.entry.x &&
         this.hero.square.y === this.currentLevel.entry.y) {
@@ -428,7 +440,7 @@ Dungeon.prototype.exit = function() {
     } else {
         return;
     }
-    if (this.levelIndex < 0) { this.monitor.town(); return; }
+    if (this.levelIndex < 0) { this.context.town(); return; }
     this.currentLevel = this.levels[this.levelIndex];
     for (var ii = 0; ii < this.levels.length; ++ii) {
         if (ii === this.levelIndex) { continue; }
@@ -451,7 +463,7 @@ function Screen(options)
 }
 
 
-function Monitor(options)
+function Context(options)
 {
     this.element = options.element;
     this.height = options.height;
@@ -463,13 +475,13 @@ function Monitor(options)
                                       id: "dungeon_screen"});
     this.dungeon = new Dungeon({width: this.width,
                                 height: this.height,
-                                monitor: this});
+                                context: this});
     this.element.appendChild(this.dungeon_screen.element);
     this.dungeon.addLevel({x: Math.floor(this.width / 2),
                            y: Math.floor(this.height / 2)},
                           this.dungeon_screen.element);
     this.hero = {hp: 10,
-                 entity: ['\u00a1', 'hero'],
+                 entity: ['I', 'hero'],
                  square: this.dungeon.currentLevel.grid[Math.floor(this.width / 2)]
                                                        [Math.floor(this.height / 2)]};
     this.hero.square.add(this.hero.entity);
@@ -482,16 +494,16 @@ function Monitor(options)
     this.element.appendChild(this.message_bar);
 }
 
-Monitor.prototype.refresh = function() {
+Context.prototype.refresh = function() {
     this.print_status();
     this.print_message();
 };
 
-Monitor.prototype.print_status = function() {
+Context.prototype.print_status = function() {
     this.status_bar.innerHTML = "status bar";
 };
 
-Monitor.prototype.print_message = function() {
+Context.prototype.print_message = function() {
     if (this.message_idx !== undefined) {
         this.message_bar.innerHTML = this.messages[this.message_idx];
     } else {
@@ -499,32 +511,32 @@ Monitor.prototype.print_message = function() {
     }
 };
 
-Monitor.prototype.add_message = function(message) {
+Context.prototype.add_message = function(message) {
     this.messages.push(message);
     if (this.message_idx === undefined) { this.message_idx = 0; }
 };
 
-Monitor.prototype.handleInput = function(event)
+Context.prototype.handleInput = function(event)
 {
     switch (getChar(event || window.event)) {
         case "a":
         case "h":
-            monitor.dungeon.move(LEFT);
+            context.dungeon.move(LEFT);
             break;
         case "s":
         case "j":
-            monitor.dungeon.move(DOWN);
+            context.dungeon.move(DOWN);
             break;
         case "w":
         case "k":
-            monitor.dungeon.move(UP);
+            context.dungeon.move(UP);
             break;
         case "d":
         case "l":
-            monitor.dungeon.move(RIGHT);
+            context.dungeon.move(RIGHT);
             break;
         case "u":
-            monitor.dungeon.exit();
+            context.dungeon.exit();
             break;
         case ",":
             if (this.message_idx + 1 <= this.messages.length) {
@@ -546,24 +558,24 @@ Monitor.prototype.handleInput = function(event)
             //console.log(getChar(event || window.event));
             return true;
     }
-    monitor.refresh();
+    context.refresh();
     return false;
 };
 
-Monitor.prototype.town = function() {
+Context.prototype.town = function() {
 };
 
 
-var monitor = null;
+var context = null;
 function init()
 {
-    monitor = new Monitor({element: document.createElement("div"),
+    context = new Context({element: document.createElement("div"),
                            height: 25,
                            width: 50});
-    document.getElementById("monitor").appendChild(monitor.element);
-    document.onkeypress = monitor.handleInput;
-    monitor.add_message("Initialization complete!");
-    monitor.refresh();
+    document.getElementById("context").appendChild(context.element);
+    document.onkeypress = context.handleInput;
+    context.add_message("Initialization complete!");
+    context.refresh();
 }
 
 var lighting = [
@@ -577,10 +589,10 @@ var lights = ["pitch", "dark", "dim", ""];
 function update_visibility(position) {
     for (var xx = -2; xx <= 2; ++xx) {
         var nx = position.x + xx;
-        if (nx < 0 || nx >= monitor.width) { continue; }
+        if (nx < 0 || nx >= context.width) { continue; }
         for (var yy = -2; yy <= 2; ++yy) {
             var ny = position.y + yy;
-            if (ny < 0 || ny >= monitor.height) { continue; }
+            if (ny < 0 || ny >= context.height) { continue; }
                if (lighting[xx + 2][yy + 2] > grid[nx][ny].dataset.visibility) {
                     grid[nx][ny].dataset.visibility = lighting[xx + 2][yy + 2];
                     fixVisibilityClass(nx, ny);
