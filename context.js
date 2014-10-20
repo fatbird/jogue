@@ -47,9 +47,6 @@ Context.prototype.print_status = function() {
                  .replace("{3}", String(this.dungeon.levelIndex + 1).lpad(2, "data"));
     this.status_bar.innerHTML = status;
 };
-/*
- *
- */
 
 Context.prototype.print_message = function() {
     if (this.message_idx !== undefined) {
@@ -65,59 +62,48 @@ Context.prototype.add_message = function(message) {
 };
 
 Context.prototype.handleInput = function(event) {
-    switch (Context.prototype.getChar(event || window.event)) {
-        case "a":
-        case "h":
-            context.dungeon.move(LEFT);
-            break;
-        case "s":
-        case "j":
-            context.dungeon.move(DOWN);
-            break;
-        case "w":
-        case "k":
-            context.dungeon.move(UP);
-            break;
-        case "d":
-        case "l":
-            context.dungeon.move(RIGHT);
-            break;
-        case "u":
-            context.dungeon.exit();
-            break;
-        case ",":
-            if (this.message_idx + 1 <= this.messages.length) {
-                ++this.message_idx;
-            }
-            break;
-        case ".":
-            if (this.message_idx - 1 >= 1) { --this.message_idx; }
-            break;
-        case "/":
-            this.messages.splice(this.messages.length - this.message_idx, 1);
-            if (this.message_idx > this.messages.length) {
-                this.message_idx = this.messages.length;
-            }
-            break;
-        default:
-            //console.log(this.getChar(event || window.event));
-            return true;
+    var key = Context.prototype.getChar(event || window.event);
+    switch (key) {
+    case N:
+    case NE:
+    case E:
+    case SE:
+    case S:
+    case SW:
+    case W:
+    case NW:
+        context.dungeon.move(key);
+        break;
+    case "f":
+        context.dungeon.exit();
+        break;
+    case "c":
+        if (this.message_idx + 1 <= this.messages.length) {
+            ++this.message_idx;
+        }
+        break;
+    case "v":
+        if (this.message_idx - 1 >= 1) { --this.message_idx; }
+        break;
+    case "x":
+        this.messages.splice(this.messages.length - this.message_idx, 1);
+        if (this.message_idx > this.messages.length) {
+            this.message_idx = this.messages.length;
+        }
+        break;
+    default:
+        //console.log(this.getChar(event || window.event));
+        return true;
     }
     context.refresh();
     return false;
 };
 
-Context.prototype.town = function() {
-};
-
-Context.prototype.getChar = function(event)
-{
+Context.prototype.getChar = function(event) {
     if (event.which === null) {
         return String.fromCharCode(event.keyCode);  // IE
     } else if (event.which !== 0 && event.charCode !== 0) {
         return String.fromCharCode(event.which);   // the rest
-    } else {
-        return null;  // special key
     }
 };
 

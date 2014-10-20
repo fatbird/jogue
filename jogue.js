@@ -87,22 +87,39 @@ Dungeon.prototype.addLevel = function(start, parent) {
 };
 
 var LEFT = 0, UP = 1, RIGHT = 2, DOWN = 3, X = 0, Y = 1;
+var N = 'i', NE = 'o', E = 'l', SE = '.', S = ',', SW = 'm', W = 'j', NW = 'u';
 Dungeon.prototype.move = function(direction) {
     if (this.hero === undefined) { this.hero = this.context.hero; }
     var new_position = {x: this.hero.square.x, y: this.hero.square.y};
     allowed = false;
     switch(direction) {
-        case LEFT:
-            new_position.x -= 1;
-            break;
-        case RIGHT:
-            new_position.x += 1;
-            break;
-        case UP:
+        case N:
             new_position.y -= 1;
             break;
-        case DOWN:
+        case NE:
+            new_position.x += 1;
+            new_position.y -= 1;
+            break;
+        case E:
+            new_position.x += 1;
+            break;
+        case SE:
+            new_position.x += 1;
             new_position.y += 1;
+            break;
+        case S:
+            new_position.y += 1;
+            break;
+        case SW:
+            new_position.x -= 1;
+            new_position.y += 1;
+            break;
+        case W:
+            new_position.x -= 1;
+            break;
+        case NW:
+            new_position.x -= 1;
+            new_position.y -= 1;
             break;
     }
     new_position = this.currentLevel.grid[new_position.x][new_position.y];
