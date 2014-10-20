@@ -1,4 +1,4 @@
-var hero  = {html: 'I', classes: ['hero'], instance: {hp: 10}},
+var hero  = {html: 'I', classes: ['hero'], instance: {hp: 10, inventory: []}},
 
     mobs  = {
         bard:     {html: '\u266a', classes: ['mob']},
@@ -12,6 +12,13 @@ var hero  = {html: 'I', classes: ['hero'], instance: {hp: 10}},
     },
 
     items = {
+        dagger:  {name: 'dagger', damage: 4},
+        sword:   {name: 'sword', damage: 8},
+
+        tunic:   {name: 'tunic', armor: 1},
+        leather: {name: 'leather', armor: 2},
+        chain:   {name: 'chain', armor: 3},
+
         chest: {html: '\u2709', classes: ['item']},
         pile:  {html: '\u2234', classes: ['item', 'bold']}
     },
