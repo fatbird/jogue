@@ -1,49 +1,58 @@
-function Square(options)
-{
+/**
+ * Return a random integer within min/max bounds; if not specified, min
+ * defaults to 0 and max defaults to the length of the array.
+ */
+Array.prototype.random = function(min, max) {
+    min = min || 0;
+    max = max || this.length;
+    return Math.floor(Math.random() * (max - min) + min);
+};
+
+/**
+ * Return a random element from the array
+ */
+Array.prototype.choice = function() { return this[this.random()]; };
+
+/**
+ * Remove the item if found, return boolean indicating actual removal.
+ */
+Array.prototype.remove = function(item) {
+    if ((ii = this.indexOf(item)) > -1) { return !! this.splice(ii, 1); }
+    return false;
+};
+
+/**
+ * Remove and return a random element, or undefined from an empty array.
+ */
+Array.prototype.draw = function() {
+    return this.splice(this.random(), 1)[0];
+};
+
+
+function Square(options) {
     this.x = options.x;
     this.y = options.y;
-    this.visibility = 0;
+    this.visibility = 3;
     this.entity = options.entity || wall;
     this.level = options.level;
     this._span = undefined;
-    this._classes = ['grid'].concat(this.entity[1] || []);
+    this._classes = ['grid'].concat(this.entity.classes || []);
+    this._previous = [];
 }
 
 Square.prototype.add = function(entity) {
-    if (! this.previous) { this.previous = []; }
-    this.previous.push(this.entity);
-    if (this.entity[1]) {
-        for (var ii = 0; ii < this.entity[1].length; ++ii) {
-            this.removeClass(this.entity[1][ii]);
-        }
-    }
+    this._previous.push(this.entity);
+    this.entity.classes.forEach(function(cls) { this.removeClass(cls); }, this);
     this.entity = entity;
-    classes = typeof(this.entity[1]) === "string" ? [this.entity[1]] : this.entity[1];
-    if (classes) {
-        for (var kk = 0; kk < classes.length; ++kk) {
-            this.addClass(classes[kk]);
-        }
-    }
-    this.span().innerHTML = entity[0];
+    this.entity.classes.forEach(function(cls) { this.addClass(cls); }, this);
+    this.span().innerHTML = entity.html;
 };
 
 Square.prototype.remove = function(entity) {
-    if (! this.previous) { return; }
-    classes = typeof(this.entity[1]) === "string" ? [this.entity[1]] : this.entity[1];
-    if (classes) {
-        for (var ii = 0; ii < classes.length; ++ii) {
-            this.removeClass(classes[ii]);
-        }
-    }
-    this.entity = this.previous.pop();
-    if (this.entity === undefined) { return; }
-    classes = typeof(this.entity[1]) === "string" ? [this.entity[1]] : this.entity[1];
-    if (classes) {
-        for (var kk = 0; kk < classes.length; ++kk) {
-            this.addClass(classes[kk]);
-        }
-    }
-    this.span().innerHTML = this.entity[0];
+    this.entity.classes.forEach(function(cls) { this.removeClass(cls); }, this);
+    this.entity = this._previous.pop();
+    this.entity.classes.forEach(function(cls) { this.addClass(cls); }, this);
+    this.span().innerHTML = this.entity.html;
 };
 
 Square.prototype.cardinals = {"nw": [-1, -1], "n": [0, -1], "ne": [1, -1],
@@ -57,7 +66,7 @@ Square.prototype.span = function() {
     if (this._span === undefined) {
         this._span = document.createElement("span");
         this._span.setAttribute("id", this.x + "," + this.y);
-        this._span.innerHTML = this.entity[0];
+        this._span.innerHTML = this.entity.html;
         this._classes.push(this.lighting[this.visibility]);
         this._span.className = this._classes.join(" ");
     }
@@ -137,8 +146,10 @@ Square.prototype.markAvailableWalls = function(dir) {
     return true;
 };
 
-function Level(options)
-{
+Square.prototype.getId = function() { return this.x + "," + this.y; };
+
+
+function Level(options) {
     this.width = options.width;
     this.height = options.height;
     this.level = options.level;
@@ -147,6 +158,8 @@ function Level(options)
     this.grid = [];
     this.available = {};
     this.open = [];
+    this.mobs = [];
+    this.items = [];
 
     var xx, yy, row;
     for (yy = 0; yy < this.height; ++yy) {
@@ -173,6 +186,8 @@ function Level(options)
     }
 }
 
+/**
+ */
 Level.prototype.random = function(min, max) {
     return Math.floor(Math.random() * (max - min) + min);
 };
@@ -204,7 +219,10 @@ Level.prototype.generateLevel = function() {
     var params = this.getRoomParameters(),
         max_attempts = 60,
         max_rooms = 15,
-        num_rooms = 1;
+        num_rooms = 1,
+        max_mobs = 15,
+        max_items = 3,
+        mob, item, loc, xy;
     this.addRoom(this.entry, params.dir, params.lat, params.lng);
     for (var ii = 0; ii < max_attempts && num_rooms < max_rooms; ++ii) {
         var keys = Object.keys(this.available),
@@ -214,11 +232,44 @@ Level.prototype.generateLevel = function() {
         params = this.getRoomParameters();
         if (this.addRoom(door, dir, params.lat, params.lng)) { ++num_rooms; }
     }
+
+    // add entry and exit
     this.entry = this.grid[this.entry.x][this.entry.y];
     this.entry.add(up);
+    this.open.remove(this.entry.getId());
     this.exit = this.choice.apply(this, this.open).split(",");
     this.exit = this.grid[this.exit[0]][this.exit[1]];
     this.exit.add(down);
+
+    // add mobs
+    for (var kk = 0; kk < max_mobs; ++kk) {
+        mob = this.generateMob();
+        xy = this.open.draw().split(",");
+        this.mobs.push(mob);
+        this.grid[xy[0]][xy[1]].add(mob);
+    }
+
+    // add items
+    for (var ll = 0; ll < max_items; ++ll) {
+        item = this.generateItem();
+        xy = this.open.draw().split(",");
+        this.items.push(item);
+        this.grid[xy[0]][xy[1]].add(item);
+    }
+};
+
+Level.prototype.generateMob = function() {
+    var type = Object.keys(mobs).choice(),
+        mob = Object.create(mobs[type]);
+    mob.hp = 10;
+    mob.classes.push(type);
+    return mob;
+};
+
+Level.prototype.generateItem = function() {
+    var type = arguments[0] || Object.keys(items).choice(),
+        item = Object.create(items[type]);
+    return item;
 };
 
 Level.prototype.addRoom = function(door, dir, lat, lng) {
@@ -301,11 +352,11 @@ Level.prototype.addRoom = function(door, dir, lat, lng) {
     if (height + 1 < lng.min) { return false; }
     for (xx = room[nw].x; xx <= room[se].x; ++xx) {
         for (yy = room[nw].y; yy <= room[se].y; ++yy) {
-            this.set(new Square({x: xx, y: yy, entity: floor, level: this}));
+            this.grid[xx][yy].add(floor);
             this.open.push(xx + "," + yy);
         }
     }
-    this.set(new Square({x: door.x, y: door.y, entity: floor, level: this}));
+    this.grid[door.x][door.y].add(floor);
 
     // update available walls
     for (xx = room[nw].x; xx <= room[se].x; ++xx) {
@@ -318,20 +369,6 @@ Level.prototype.addRoom = function(door, dir, lat, lng) {
     }
 
     return true;
-};
-
-Level.prototype.set = function(square) {
-    var old = this.grid[square.x][square.y].span();
-    this.grid[square.x][square.y] = square;
-    this.element.children[square.y].replaceChild(square.span(), old);
-    for (var dir in Square.prototype.cardinals) {
-        try {
-            var nx = square.x + Square.prototype.cardinals[dir][0],
-                ny = square.y + Square.prototype.cardinals[dir][1];
-            square[dir] = this.grid[nx][ny];
-            this.grid[nx][ny][Square.prototype.reverse[dir]] = square;
-        } catch(err) { square[dir] = undefined; }
-    }
 };
 
 Level.prototype.isAllowed = function(position) {
@@ -366,8 +403,7 @@ Level.prototype.updateVisibility = function(square) {
 };
 
 
-function Dungeon(options)
-{
+function Dungeon(options) {
     this.width = options.width;
     this.height = options.height;
     this.levels = [];
@@ -393,8 +429,7 @@ Dungeon.prototype.addLevel = function(start, parent) {
 };
 
 var LEFT = 0, UP = 1, RIGHT = 2, DOWN = 3, X = 0, Y = 1;
-Dungeon.prototype.move = function(direction)
-{
+Dungeon.prototype.move = function(direction) {
     if (this.hero === undefined) { this.hero = this.context.hero; }
     var new_position = {x: this.hero.square.x, y: this.hero.square.y};
     allowed = false;
@@ -414,9 +449,9 @@ Dungeon.prototype.move = function(direction)
     }
     new_position = this.currentLevel.grid[new_position.x][new_position.y];
     if (this.currentLevel.isAllowed(new_position)) {
-        this.hero.square.remove(this.hero.entity);
+        this.hero.square.remove(this.hero);
         this.hero.square = new_position;
-        this.hero.square.add(this.hero.entity);
+        this.hero.square.add(this.hero);
         this.currentLevel.updateVisibility(this.hero.square);
     }
     this.context.refresh();
@@ -428,7 +463,7 @@ Dungeon.prototype.exit = function() {
     if (this.hero.square.x === this.currentLevel.entry.x &&
         this.hero.square.y === this.currentLevel.entry.y) {
         --this.levelIndex;
-        this.hero.square.remove(this.hero.entity);
+        this.hero.square.remove(this.hero);
         loc = "exit";
     } else if (this.hero.square.x === this.currentLevel.exit.x &&
                this.hero.square.y === this.currentLevel.exit.y) {
@@ -436,7 +471,7 @@ Dungeon.prototype.exit = function() {
             this.addLevel({x: this.hero.square.x, y: this.hero.square.y});
         }
         ++this.levelIndex;
-        this.hero.square.remove(this.hero.entity);
+        this.hero.square.remove(this.hero);
     } else {
         return;
     }
@@ -449,12 +484,11 @@ Dungeon.prototype.exit = function() {
     this.currentLevel.element.style.display = "block";
     this.hero.square = this.currentLevel.grid[this.currentLevel[loc].x]
                                              [this.currentLevel[loc].y];
-    this.hero.square.add(this.hero.entity);
+    this.hero.square.add(this.hero);
     this.currentLevel.updateVisibility(this.hero.square);
 };
 
-function Screen(options)
-{
+function Screen(options) {
     this.height = options.height;
     this.width = options.width;
     this.id = options.id;
@@ -463,8 +497,7 @@ function Screen(options)
 }
 
 
-function Context(options)
-{
+function Context(options) {
     this.element = options.element;
     this.height = options.height;
     this.width = options.width;
@@ -480,11 +513,10 @@ function Context(options)
     this.dungeon.addLevel({x: Math.floor(this.width / 2),
                            y: Math.floor(this.height / 2)},
                           this.dungeon_screen.element);
-    this.hero = {hp: 10,
-                 entity: ['I', 'hero'],
-                 square: this.dungeon.currentLevel.grid[Math.floor(this.width / 2)]
-                                                       [Math.floor(this.height / 2)]};
-    this.hero.square.add(this.hero.entity);
+    this.hero = hero;
+    this.hero.square = this.dungeon.currentLevel.grid[Math.floor(this.width / 2)]
+                                                     [Math.floor(this.height / 2)];
+    this.hero.square.add(this.hero);
     this.dungeon.currentLevel.updateVisibility(this.hero.square);
 
     this.status_bar = document.createElement("div");
@@ -516,9 +548,8 @@ Context.prototype.add_message = function(message) {
     if (this.message_idx === undefined) { this.message_idx = 0; }
 };
 
-Context.prototype.handleInput = function(event)
-{
-    switch (getChar(event || window.event)) {
+Context.prototype.handleInput = function(event) {
+    switch (Context.prototype.getChar(event || window.event)) {
         case "a":
         case "h":
             context.dungeon.move(LEFT);
@@ -544,9 +575,7 @@ Context.prototype.handleInput = function(event)
             }
             break;
         case ".":
-            if (this.message_idx - 1 >= 1) {
-            --this.message_idx;
-            }
+            if (this.message_idx - 1 >= 1) { --this.message_idx; }
             break;
         case "/":
             this.messages.splice(this.messages.length - this.message_idx, 1);
@@ -555,7 +584,7 @@ Context.prototype.handleInput = function(event)
             }
             break;
         default:
-            //console.log(getChar(event || window.event));
+            //console.log(this.getChar(event || window.event));
             return true;
     }
     context.refresh();
@@ -565,10 +594,20 @@ Context.prototype.handleInput = function(event)
 Context.prototype.town = function() {
 };
 
+Context.prototype.getChar = function(event)
+{
+    if (event.which === null) {
+        return String.fromCharCode(event.keyCode);  // IE
+    } else if (event.which !== 0 && event.charCode !== 0) {
+        return String.fromCharCode(event.which);   // the rest
+    } else {
+        return null;  // special key
+    }
+};
+
 
 var context = null;
-function init()
-{
+function init() {
     context = new Context({element: document.createElement("div"),
                            height: 25,
                            width: 50});
@@ -578,50 +617,4 @@ function init()
     context.refresh();
 }
 
-var lighting = [
-    [1, 2, 2, 2, 1],
-    [2, 3, 3, 3, 2],
-    [2, 3, 3, 3, 2],
-    [2, 3, 3, 3, 2],
-    [1, 2, 2, 2, 1]
-];
-var lights = ["pitch", "dark", "dim", ""];
-function update_visibility(position) {
-    for (var xx = -2; xx <= 2; ++xx) {
-        var nx = position.x + xx;
-        if (nx < 0 || nx >= context.width) { continue; }
-        for (var yy = -2; yy <= 2; ++yy) {
-            var ny = position.y + yy;
-            if (ny < 0 || ny >= context.height) { continue; }
-               if (lighting[xx + 2][yy + 2] > grid[nx][ny].dataset.visibility) {
-                    grid[nx][ny].dataset.visibility = lighting[xx + 2][yy + 2];
-                    fixVisibilityClass(nx, ny);
-               }
-        }
-    }
-}
-
-function fixVisibilityClass(x, y) {
-    var classes = grid[x][y].className.split(" ");
-    for (var ii = 0; ii < lights.length; ++ii) {
-        var index = classes.indexOf(lights[ii]);
-        if (index > -1) {
-            classes.splice(index, 1);
-        }
-    }
-    classes.push(lights[grid[x][y].dataset.visibility]);
-    grid[x][y].className = classes.join(" ");
-}
-
-
-function getChar(event)
-{
-    if (event.which === null) {
-        return String.fromCharCode(event.keyCode);  // IE
-    } else if (event.which !== 0 && event.charCode !== 0) {
-        return String.fromCharCode(event.which);   // the rest
-    } else {
-        return null;  // special key
-    }
-}
 

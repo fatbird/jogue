@@ -16,15 +16,19 @@ div#context .row { display: table-row; }
     height: 20px;
     background: #111;
     text-align: center;
+    overflow: hidden;
+    line-height: 100%;
 }
-.wall { background: #666; font-weight: bold; }
+.wall { background: #555; font-weight: bold; }
 .text { color: #666; }
 .data { color: #999; font-weight: bold; }
 .status { color: #666; }
-.monster { color: #990000; }
 .floor { color: #191919; }
 .stairs { color: #CC9; }
-.hero { color: #FFFFCC; font-weight: bold; }
+.hero { color: #36c; font-weight: bold; }
+.mob { color: #990000; }
+.item { color: #554433; }
+.bold { font-weight: bold; }
 
 .pitch { opacity: 0; }
 .dark { opacity: 0.40; }
