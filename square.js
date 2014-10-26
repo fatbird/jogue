@@ -10,16 +10,20 @@ function Square(options) {
 }
 
 Square.prototype.add = function(entity) {
-    this._previous.push(this.entity);
+    this._previous.unshift(this.entity);
     this.entity.classes.forEach(function(cls) { this.removeClass(cls); }, this);
     this.entity = entity;
     this.entity.classes.forEach(function(cls) { this.addClass(cls); }, this);
     this.span().innerHTML = entity.html;
 };
 
+Square.prototype.last = function() {
+    return this._previous[0];
+};
+
 Square.prototype.remove = function(entity) {
     this.entity.classes.forEach(function(cls) { this.removeClass(cls); }, this);
-    this.entity = this._previous.pop();
+    this.entity = this._previous.shift();
     this.entity.classes.forEach(function(cls) { this.addClass(cls); }, this);
     this.span().innerHTML = this.entity.html;
 };

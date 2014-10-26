@@ -22,14 +22,17 @@ div#context .row { display: table-row; }
 .status { color: #666; }
 .status .data { color: #CCC; }
 
-.messages { color: #999; }
+.messages { color: #999; line-height: 1.2em; height: 3.6em;}
+.messages .first { }
+.messages .second { opacity: 0.7; }
+.messages .third { opacity: 0.5; }
 
 .wall { background: #555; font-weight: bold; }
 
 .floor { color: #191919; }
 .stairs { color: #CC9; }
-.hero { color: #36c; font-weight: bold; }
 .mob { color: #990000; }
+.hero { color: #36c; font-weight: bold; }
 .item { color: #554433; }
 .bold { font-weight: bold; }
 

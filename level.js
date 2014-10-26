@@ -93,7 +93,7 @@ Level.prototype.generateLevel = function() {
 
     // add items
     for (var ll = 0; ll < max_items; ++ll) {
-        item = this.generateItem([items.chest, items.pile].choice());
+        item = this.generateItem(["Chest", "Pile"].choice());
         xy = this.open.draw().split(",");
         this.items.push(item);
         this.grid[xy[0]][xy[1]].add(item);
@@ -101,17 +101,13 @@ Level.prototype.generateLevel = function() {
 };
 
 Level.prototype.generateMob = function() {
-    var type = Object.keys(mobs).choice(),
-        mob = Object.create(mobs[type]);
-    mob.hp = 10;
-    mob.classes.push(type);
-    return mob;
+    var type = Object.keys(mobs).choice();
+    return new window[type]();
 };
 
 Level.prototype.generateItem = function() {
-    var type = arguments[0] || items[Object.keys(items).choice()],
-        item = Object.create(type);
-    return item;
+    var type = arguments[0] || items[Object.keys(items).choice()];
+    return new window[type]();
 };
 
 Level.prototype.addRoom = function(door, dir, lat, lng) {
@@ -212,13 +208,6 @@ Level.prototype.addRoom = function(door, dir, lat, lng) {
 
     return true;
 };
-
-Level.prototype.isAllowed = function(position) {
-    if (position.x < 0 || position.x >= this.width) { return false; }
-    if (position.y < 0 || position.y >= this.height) { return false; }
-    return position.entity !== wall;
-};
-
 
 var visibility_grid = [
     [[1, 2], [2], [1, 2]],

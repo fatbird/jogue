@@ -93,43 +93,61 @@ Dungeon.prototype.move = function(direction) {
     var new_position = {x: this.hero.square.x, y: this.hero.square.y};
     allowed = false;
     switch(direction) {
-        case N:
-            new_position.y -= 1;
-            break;
-        case NE:
-            new_position.x += 1;
-            new_position.y -= 1;
-            break;
-        case E:
-            new_position.x += 1;
-            break;
-        case SE:
-            new_position.x += 1;
-            new_position.y += 1;
-            break;
-        case S:
-            new_position.y += 1;
-            break;
-        case SW:
-            new_position.x -= 1;
-            new_position.y += 1;
-            break;
-        case W:
-            new_position.x -= 1;
-            break;
-        case NW:
-            new_position.x -= 1;
-            new_position.y -= 1;
-            break;
+    case N:
+        new_position.y -= 1;
+        break;
+    case NE:
+        new_position.x += 1;
+        new_position.y -= 1;
+        break;
+    case E:
+        new_position.x += 1;
+        break;
+    case SE:
+        new_position.x += 1;
+        new_position.y += 1;
+        break;
+    case S:
+        new_position.y += 1;
+        break;
+    case SW:
+        new_position.x -= 1;
+        new_position.y += 1;
+        break;
+    case W:
+        new_position.x -= 1;
+        break;
+    case NW:
+        new_position.x -= 1;
+        new_position.y -= 1;
+        break;
     }
     new_position = this.currentLevel.grid[new_position.x][new_position.y];
-    if (this.currentLevel.isAllowed(new_position)) {
+    var can_move = false;
+    if (new_position.entity === wall) { return; }
+    else if (new_position.entity === floor ||
+             new_position.entity === up ||
+             new_position.entity === down ||
+             new_position.entity.classes.indexOf("item") > -1) {
+        can_move = true;
+    }
+    else if (new_position.entity.constructor === Mob) {
+        can_move = false;
+    }
+    if (can_move) {
         this.hero.square.remove(this.hero);
         this.hero.square = new_position;
         this.hero.square.add(this.hero);
         this.currentLevel.updateVisibility(this.hero.square);
     }
     this.context.refresh();
+};
+
+Dungeon.prototype.activate = function() {
+    var square = this.hero.square;
+    if (square.last() === up || square.last() === down) { this.exit(); }
+    if (square.last().constructor === Item) {
+    }
 };
 
 Dungeon.prototype.exit = function() {

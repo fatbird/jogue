@@ -14,15 +14,16 @@ function Context(options) {
     this.dungeon.addLevel({x: Math.floor(this.width / 2),
                            y: Math.floor(this.height / 2)},
                           this.dungeon_screen.element);
-    this.hero = hero;
-    this.hero.square = this.dungeon.currentLevel.grid[Math.floor(this.width / 2)]
-                                                     [Math.floor(this.height / 2)];
+    this.hero = new Hero();
+    this.hero.square = this.dungeon.currentLevel.grid[Math.floor(this.width/2)]
+                                                     [Math.floor(this.height/2)];
     this.hero.square.add(this.hero);
-    this.hero.instance.inventory.push(Object.create(items.dagger));
-    this.hero.instance.equipped = this.hero.instance.inventory.last();
-    this.hero.instance.inventory.push(Object.create(items.tunic));
-    this.hero.instance.worn = this.hero.instance.inventory.last();
+    this.hero.inventory.push(Object.create(new Dagger()));
+    this.hero.equipped = this.hero.inventory.last();
+    this.hero.inventory.push(Object.create(new Tunic()));
+    this.hero.worn = this.hero.inventory.last();
     this.dungeon.currentLevel.updateVisibility(this.hero.square);
+    this.dungeon.hero = this.hero;
 
     this.status_bar = document.createElement("div");
     this.status_bar.className = "status";
@@ -41,24 +42,28 @@ Context.prototype.refresh = function() {
 Context.prototype.print_status = function() {
     var hero = this.hero.instance,
         status = "HP: {0} E: {1} W: {2} Level: {3}           ? for help"
-                 .replace("{0}", String(hero.hp).rpad(4, "data"))
-                 .replace("{1}", String(hero.equipped).rpad(12, "data"))
-                 .replace("{2}", String(hero.worn).rpad(12, "data"))
+                 .replace("{0}", String(this.hero.hp).rpad(4, "data"))
+                 .replace("{1}", String(this.hero.equipped).rpad(12, "data"))
+                 .replace("{2}", String(this.hero.worn).rpad(12, "data"))
                  .replace("{3}", String(this.dungeon.levelIndex + 1).lpad(2, "data"));
     this.status_bar.innerHTML = status;
 };
 
+var msg_classes = ["first", "second", "third"];
 Context.prototype.print_message = function() {
-    if (this.message_idx !== undefined) {
-        this.message_bar.innerHTML = this.messages[this.message_idx];
-    } else {
-        this.message_bar.innerHTML = "";
+    var messages = '';
+    for (var ii = 0; ii < 3; ++ii) {
+        if (this.messages[ii + this.message_idx]) {
+            messages += "<div class='" + msg_classes[ii] + "'>" +
+                        this.messages[ii + this.message_idx] + "</span>";
+        }
     }
+    this.message_bar.innerHTML = messages;
 };
 
 Context.prototype.add_message = function(message) {
     this.messages.push(message);
-    if (this.message_idx === undefined) { this.message_idx = 0; }
+    if (! this.message_idx) { this.message_idx = 0; }
 };
 
 Context.prototype.handleInput = function(event) {
@@ -74,22 +79,21 @@ Context.prototype.handleInput = function(event) {
     case NW:
         context.dungeon.move(key);
         break;
-    case "f":
-        context.dungeon.exit();
+    case "k":  // "use" object in current square
+        context.dungeon.activate();
         break;
-    case "c":
-        if (this.message_idx + 1 <= this.messages.length) {
-            ++this.message_idx;
+    case "h":  // scrolling messages up i.e., back through earlier messages
+        if (context.message_idx + 1 < context.messages.length) {
+            ++context.message_idx;
         }
         break;
-    case "v":
-        if (this.message_idx - 1 >= 1) { --this.message_idx; }
+    case "y":  // scrolling messages down i.e., to latest messages
+        if (context.message_idx > 0) { --context.message_idx; }
         break;
-    case "x":
-        this.messages.splice(this.messages.length - this.message_idx, 1);
-        if (this.message_idx > this.messages.length) {
-            this.message_idx = this.messages.length;
-        }
+    case "n":  // delete current messages
+        context.messages.splice(context.message_idx, 1);
+        context.message_idx = Math.min(context.message_idx,
+                                       context.messages.length - 1);
         break;
     default:
         //console.log(this.getChar(event || window.event));

@@ -1,26 +1,42 @@
-var hero  = {html: 'I', classes: ['hero'], instance: {hp: 10, inventory: []}},
+function Mob() {
+    this.html = '';
+    this.classes = ['mob'];
+    this.hp = 10;
+    this.inventory = [];
+    this.equipped = undefined;
+    this.worn = undefined;
+}
 
-    mobs  = {
-        bard:     {html: '\u266a', classes: ['mob']},
-        snake:    {html: '\u2621', classes: ['mob']},
-        skull:    {html: '\u2620', classes: ['mob']},
-        bishop:   {html: '\u2657', classes: ['mob']},
-        hippie:   {html: '\u2672', classes: ['mob']},
-        dwarf:    {html: '\u2692', classes: ['mob']},
-        cuberoot: {html: '\u221b', classes: ['mob']},
-        empty:    {html: '\u2205', classes: ['mob']}
+function Item() {
+    this.html = '';
+    this.classes = ['item'];
+    this.contains = [];
+    this.consumable = false;
+    this.carryable = true;
+}
+
+var mobs  = {
+        Bard:     {html: '\u266a', },
+        Snake:    {html: '\u2621', },
+        Skull:    {html: '\u2620', },
+        Bishop:   {html: '\u2657', },
+        Hippie:   {html: '\u2672', },
+        Dwarf:    {html: '\u2692', },
+        Cuberoot: {html: '\u221b', },
+        Empty:    {html: '\u2205', }
     },
+    hero = {html: 'I', },
 
     items = {
-        dagger:  {name: 'dagger', damage: 4},
-        sword:   {name: 'sword', damage: 8},
+        Dagger:  {damage: 4},
+        Sword:   {damage: 8},
 
-        tunic:   {name: 'tunic', armor: 1},
-        leather: {name: 'leather', armor: 2},
-        chain:   {name: 'chain', armor: 3},
+        Tunic:   {armor: 1},
+        Leather: {armor: 2},
+        Chain:   {armor: 3},
 
-        chest: {html: '\u2709', classes: ['item']},
-        pile:  {html: '\u2234', classes: ['item', 'bold']}
+        Chest: {html: '\u2709', consumable: true, carryable: false},
+        Pile:  {html: '\u2234', consumable: true, carryable: false}
     },
 
     wall  = {html: ' ', classes: ['wall']},
@@ -30,3 +46,22 @@ var hero  = {html: 'I', classes: ['hero'], instance: {hp: 10, inventory: []}},
 
     none = null
 ;
+
+/**
+ * Create a class of each mob described above
+ */
+function makeClass(Prototype, type, properties) {
+    window[type] = function() {
+        Prototype.call(this);
+        for (var attr in properties) { this[attr] = properties[attr]; }
+        this.name = type;
+        this.classes.push(type.toLowerCase());
+    };
+    window[type].prototype = new Prototype();
+    window[type].constructor = window[type];
+}
+
+for (var type in items) { makeClass(Item, type, items[type]); }
+for (var type in mobs) { makeClass(Mob, type, mobs[type]); }
+makeClass(Mob, "Hero", hero);
+
