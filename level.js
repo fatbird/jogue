@@ -62,8 +62,8 @@ Level.prototype.generateLevel = function() {
         max_attempts = 60,
         max_rooms = 15,
         num_rooms = 1,
-        max_mobs = 15,
-        max_items = 3,
+        max_mobs = 10,
+        max_items = 4,
         mob, item, loc, xy;
     this.addRoom(this.entry, params.dir, params.lat, params.lng);
     for (var ii = 0; ii < max_attempts && num_rooms < max_rooms; ++ii) {
@@ -101,13 +101,27 @@ Level.prototype.generateLevel = function() {
 };
 
 Level.prototype.generateMob = function() {
-    var type = Object.keys(mobs).choice();
-    return new window[type]();
+    var type = Object.keys(mobs).choice(),
+        mob = new window[type]();
+    if (mob.setup) { mob.setup(); }
+    return mob;
 };
 
 Level.prototype.generateItem = function() {
-    var type = arguments[0] || items[Object.keys(items).choice()];
-    return new window[type]();
+    var type = arguments[0] || Object.keys(items).choice(),
+        item = new window[type]();
+    if (item.consumable && ! item.carryable) {  // chest or pile
+        if ([true, false, item.name === "Chest", item.name === "Chest"].choice()) {
+            var gold = new Gold({amount: this.random(0, 10) * this.level });
+            if (gold.amount > 0) { item.contains.push(gold); }
+        }
+        if ([true, false, item.name === "Chest"].choice()) {
+            var obj = this.generateItem();
+            if (obj !== Gold) { item.contains.push(this.generateItem()); }
+        }
+    }
+    if (item.setup) { item.setup(); }
+    return item;
 };
 
 Level.prototype.addRoom = function(door, dir, lat, lng) {

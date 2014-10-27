@@ -82,6 +82,7 @@ Dungeon.prototype.addLevel = function(start, parent) {
     this.levels[this.levels.length - 1].generateLevel();
     if (this.currentLevel === undefined) {
         this.currentLevel = this.levels[0];
+        window.level = this.currentLevel;
         this.levelIndex = 0;
     }
 };
@@ -147,6 +148,33 @@ Dungeon.prototype.activate = function() {
     var square = this.hero.square;
     if (square.last() === up || square.last() === down) { this.exit(); }
     if (square.last().constructor === Item) {
+        if (square.last().consumable && ! square.last().carryable) {
+            var items = square.last().contains.slice(),
+                found = false;
+            while (item = items.shift()) {  // jshint ignore:line
+                if ((item.armor || 0) > this.hero.worn.armor) {
+                    this.hero.worn = item;
+                    context.add_message("You found " + item.name + " armor!");
+                    found = true;
+                } else if ((item.damage || 0) > this.hero.equipped.damage) {
+                    this.hero.equipped = item;
+                    context.add_message("You found a " + item.name + "!");
+                    context.print_status();
+                    found = true;
+                } else if (item.name === "Gold" && item.amount > 0) {
+                    this.hero.gold += item.amount;
+                    context.add_message("You found " + item.amount + " gold!");
+                    found = true;
+                } else if (item.name === "Chest" || item.name === "Pile") {
+                    items.concat(item.contains);
+                }
+                context.print_status();
+            }
+            if (! found) {
+                context.add_message(square.last().name + " was empty");
+            }
+            square._previous.shift();
+        }
     }
 };
 
@@ -170,6 +198,7 @@ Dungeon.prototype.exit = function() {
     }
     if (this.levelIndex < 0) { this.context.town(); return; }
     this.currentLevel = this.levels[this.levelIndex];
+    window.level = this.currentLevel;
     for (var ii = 0; ii < this.levels.length; ++ii) {
         if (ii === this.levelIndex) { continue; }
         this.levels[ii].element.style.display = "none";
@@ -188,6 +217,9 @@ function Screen(options) {
     this.id = options.id;
     this.element = document.createElement("div");
     this.element.setAttribute("id", this.id);
+    if (options.content) {
+        this.element.innerHTML = options.content;
+    }
 }
 
 
@@ -202,4 +234,30 @@ function init() {
     context.refresh();
 }
 
-
+var helpText = "\n" +
+    "    \n" +
+    "    Crawl the dungeon the find the lozenge of power!  It looks like this:" +
+    " <span class='item treasure'>\u22c4</span>\n" +
+    "    \n" +
+    "    To move in eight directions:\n" +
+    "      <strong>u</strong>  <strong>i</strong>  <strong>o</strong>\n" +
+    "      <strong>j</strong>     <strong>l</strong>\n" +
+    "      <strong>m</strong>  <strong>,</strong>  <strong>.</strong>\n" +
+    "    \n" +
+    "    To attack, stand next to a monster and move into its square!\n" +
+    "    \n" +
+    "    Chests (<span class='item'>\u2709</span>) and Piles" +
+    " (<span class='item'>\u2234</span>) hold gold or better equipment!\n" +
+    "    \n" +
+    "    To use whatever you're on: <strong>k</strong>!\n" +
+    "    \n" +
+    "    Stairs up (<span class='stairs'>\u2191</span>) and down (<span " +
+    "class='stairs'>\u2193</span>) carry you between levels!\n" +
+    "    \n" +
+    "    Messages:\n" +
+    "      <strong>y</strong>  To scroll down\n" +
+    "      <strong>h</strong>  To scroll up\n" +
+    "      <strong>n</strong>  To delete the current message\n" +
+    "    \n" +
+    "    <strong>?</strong>  To go back to the dungeon\n" +
+    "\n";

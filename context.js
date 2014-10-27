@@ -4,16 +4,17 @@ function Context(options) {
     this.width = options.width;
     this.messages = [];
     this.message_idx = undefined;
-    this.dungeon_screen = new Screen({width: this.width,
+    this.dungeonScreen = new Screen({width: this.width,
                                       height: this.height,
-                                      id: "dungeon_screen"});
+                                      id: "dungeon-screen"});
+    this.currentScreen = this.dungeonScreen;
     this.dungeon = new Dungeon({width: this.width,
                                 height: this.height,
                                 context: this});
-    this.element.appendChild(this.dungeon_screen.element);
+    this.element.appendChild(this.dungeonScreen.element);
     this.dungeon.addLevel({x: Math.floor(this.width / 2),
                            y: Math.floor(this.height / 2)},
-                          this.dungeon_screen.element);
+                          this.dungeonScreen.element);
     this.hero = new Hero();
     this.hero.square = this.dungeon.currentLevel.grid[Math.floor(this.width/2)]
                                                      [Math.floor(this.height/2)];
@@ -25,6 +26,11 @@ function Context(options) {
     this.dungeon.currentLevel.updateVisibility(this.hero.square);
     this.dungeon.hero = this.hero;
 
+    this.helpScreen = new Screen({width: this.width, height: this.height,
+                                  id: "help-screen", content: helpText});
+    this.helpScreen.element.style.display = "none";
+    this.element.appendChild(this.helpScreen.element);
+
     this.status_bar = document.createElement("div");
     this.status_bar.className = "status";
     this.element.appendChild(this.status_bar);
@@ -32,6 +38,7 @@ function Context(options) {
     this.message_bar = document.createElement("div");
     this.message_bar.className = "messages";
     this.element.appendChild(this.message_bar);
+
 }
 
 Context.prototype.refresh = function() {
@@ -41,11 +48,12 @@ Context.prototype.refresh = function() {
 
 Context.prototype.print_status = function() {
     var hero = this.hero.instance,
-        status = "HP: {0} E: {1} W: {2} Level: {3}           ? for help"
+        status = "HP: {0} E: {1} W: {2} G: {3}  Level: {3}           ? for help"
                  .replace("{0}", String(this.hero.hp).rpad(4, "data"))
                  .replace("{1}", String(this.hero.equipped).rpad(12, "data"))
                  .replace("{2}", String(this.hero.worn).rpad(12, "data"))
-                 .replace("{3}", String(this.dungeon.levelIndex + 1).lpad(2, "data"));
+                 .replace("{3}", String(this.hero.gold).rpad(4, "data"))
+                 .replace("{4}", String(this.dungeon.levelIndex + 1).lpad(2, "data"));
     this.status_bar.innerHTML = status;
 };
 
@@ -62,7 +70,7 @@ Context.prototype.print_message = function() {
 };
 
 Context.prototype.add_message = function(message) {
-    this.messages.push(message);
+    this.messages.unshift(message);
     if (! this.message_idx) { this.message_idx = 0; }
 };
 
@@ -77,10 +85,14 @@ Context.prototype.handleInput = function(event) {
     case SW:
     case W:
     case NW:
-        context.dungeon.move(key);
+        if (context.currentScreen === context.dungeonScreen) {
+            context.dungeon.move(key);
+        }
         break;
     case "k":  // "use" object in current square
-        context.dungeon.activate();
+        if (context.currentScreen === context.dungeonScreen) {
+            context.dungeon.activate();
+        }
         break;
     case "h":  // scrolling messages up i.e., back through earlier messages
         if (context.message_idx + 1 < context.messages.length) {
@@ -94,6 +106,16 @@ Context.prototype.handleInput = function(event) {
         context.messages.splice(context.message_idx, 1);
         context.message_idx = Math.min(context.message_idx,
                                        context.messages.length - 1);
+        break;
+    case "?":
+        if (context.currentScreen === context.helpScreen) {
+            context.currentScreen = context.dungeonScreen;
+            context.helpScreen.element.style.display = "none";
+        } else {
+            context.currentScreen = context.helpScreen;
+            context.dungeonScreen.element.style.display = "none";
+        }
+        context.currentScreen.element.style.display = "block";
         break;
     default:
         //console.log(this.getChar(event || window.event));
