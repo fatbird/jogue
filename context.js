@@ -48,7 +48,7 @@ Context.prototype.refresh = function() {
 
 Context.prototype.print_status = function() {
     var hero = this.hero.instance,
-        status = "HP: {0} E: {1} W: {2} G: {3}  Level: {3}           ? for help"
+        status = "HP: {0} E: {1} W: {2} G: {3}  Level: {4}           ? for help"
                  .replace("{0}", String(this.hero.hp).rpad(4, "data"))
                  .replace("{1}", String(this.hero.equipped).rpad(12, "data"))
                  .replace("{2}", String(this.hero.worn).rpad(12, "data"))
