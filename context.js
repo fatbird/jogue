@@ -23,6 +23,11 @@ function Context(options) {
     this.hero.equipped = this.hero.inventory.last();
     this.hero.inventory.push(Object.create(new Tunic()));
     this.hero.worn = this.hero.inventory.last();
+    this.hero.regenerate = function() {
+        if (random(0, 100) < 20 && context.hero.hp < context.hero.max_hp) {
+            context.hero.hp += 1;
+        }
+    };
     this.dungeon.currentLevel.updateVisibility(this.hero.square);
     this.dungeon.hero = this.hero;
 
@@ -112,6 +117,18 @@ Context.prototype.handleInput = function(event) {
         context.message_idx = Math.min(context.message_idx,
                                        context.messages.length - 1);
         break;
+    case "r":  // restart
+        if (context.currentScreen === context.gameOverScreen) {
+            setTimeout(function() {
+                var container = document.getElementById("context");
+                while (container.firstChild) {
+                    container.removeChild(container.firstChild);
+                }
+                context = null;
+                init();
+            }, 100);
+        }
+        break;
     case "?":
         if (context.currentScreen === context.helpScreen) {
             context.currentScreen = context.dungeonScreen;
@@ -126,6 +143,7 @@ Context.prototype.handleInput = function(event) {
         //console.log(this.getChar(event || window.event));
         return true;
     }
+    context.hero.regenerate();
     context.refresh();
     return false;
 };

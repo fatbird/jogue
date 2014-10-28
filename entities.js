@@ -6,6 +6,7 @@ function Mob(properties, options) {
     this.equipped = undefined;
     this.worn = undefined;
     this.gold = 0;
+    this.level = 1;
 
     properties = properties || {};
     options = options || {};
@@ -13,10 +14,15 @@ function Mob(properties, options) {
     for (var opt in options) { this[opt] = options[opt]; }
 
     this.setup = function() {
-        this.gold = Level.prototype.random(0, 10);
-        this.hp = Level.prototype.random(5, 10);
+        for (var ii = 0; ii < this.level; ++ii) {
+            this.hp += random(5, 10);
+            this.gold += random(0, 10);
+        }
+        this.max_hp = this.hp;
         if (this.equipped instanceof Array) {
             this.equipped = new window[this.equipped.choice()]();
+            this.equipped.level = this.level;
+            this.equipped.damage *= this.level;
         }
     };
 }
@@ -27,11 +33,20 @@ function Item(properties, options) {
     this.contains = [];
     this.consumable = false;
     this.carryable = true;
+    this.level = 1;
 
     properties = properties || {};
     options = options || {};
     for (var attr in properties) { this[attr] = properties[attr]; }
     for (var opt in options) { this[opt] = options[opt]; }
+
+    this.setup = function() {
+        if (this.damage) { this.damage *= this.level; }
+        if (this.armor) { this.armor *= this.level; }
+        if (this.name && (this.damage || this.armor)) {
+            this.name = "{0} ({1})".format(this.name, (this.damage || this.armor));
+        }
+    };
 }
 
 var mobs  = {
@@ -59,7 +74,9 @@ var mobs  = {
 
         Tunic:   {armor: 1},
         Leather: {armor: 2},
-        Chain:   {armor: 3},
+        Studded: {armor: 3},
+        Scale:   {armor: 4},
+        Chain:   {armor: 5},
 
         Gold:    {amount: 0},
 

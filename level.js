@@ -102,8 +102,7 @@ Level.prototype.generateLevel = function() {
 
 Level.prototype.generateMob = function() {
     var type = Object.keys(mobs).choice(),
-        mob = new window[type]();
-//    if (mob.setup) { mob.setup(); }
+        mob = new window[type]({level: this.level});
     return mob;
 };
 
