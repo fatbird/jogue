@@ -62,7 +62,7 @@ Level.prototype.generateLevel = function() {
         max_attempts = 60,
         max_rooms = 15,
         num_rooms = 1,
-        max_mobs = 10,
+        max_mobs = 20,
         max_items = 4,
         mob, item, loc, xy;
     this.addRoom(this.entry, params.dir, params.lat, params.lng);
@@ -103,7 +103,7 @@ Level.prototype.generateLevel = function() {
 Level.prototype.generateMob = function() {
     var type = Object.keys(mobs).choice(),
         mob = new window[type]();
-    if (mob.setup) { mob.setup(); }
+//    if (mob.setup) { mob.setup(); }
     return mob;
 };
 

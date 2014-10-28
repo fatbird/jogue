@@ -31,6 +31,11 @@ function Context(options) {
     this.helpScreen.element.style.display = "none";
     this.element.appendChild(this.helpScreen.element);
 
+    this.gameOverScreen = new Screen({width: this.width, height: this.height,
+                                      id: "help-screen"});
+    this.gameOverScreen.element.style.display = "none";
+    this.element.appendChild(this.gameOverScreen.element);
+
     this.status_bar = document.createElement("div");
     this.status_bar.className = "status";
     this.element.appendChild(this.status_bar);

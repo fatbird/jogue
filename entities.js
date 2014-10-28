@@ -15,6 +15,9 @@ function Mob(properties, options) {
     this.setup = function() {
         this.gold = Level.prototype.random(0, 10);
         this.hp = Level.prototype.random(5, 10);
+        if (this.equipped instanceof Array) {
+            this.equipped = new window[this.equipped.choice()]();
+        }
     };
 }
 
@@ -32,20 +35,27 @@ function Item(properties, options) {
 }
 
 var mobs  = {
-        Bard:     {html: '\u266a', },
-        Snake:    {html: '\u2621', },
-        Skull:    {html: '\u2620', },
-        Bishop:   {html: '\u2657', },
-        Hippie:   {html: '\u2672', },
-        Dwarf:    {html: '\u2692', },
-        Cuberoot: {html: '\u221b', },
-        Empty:    {html: '\u2205', }
+        Bard:     {html: '\u266a', equipped: ["Dagger", "Sword"]},
+        Snake:    {html: '\u2621', equipped: ["Fang"]},
+        Skull:    {html: '\u2620', equipped: ["Tooth"]},
+        Bishop:   {html: '\u2657', equipped: ["Mitre", "Dagger"]},
+        Hippie:   {html: '\u2672', equipped: ["Bong"]},
+        Dwarf:    {html: '\u2692', equipped: ["Pick", "Sword"]},
+        Cuberoot: {html: '\u221b', equipped: ["Modulo"]},
+        Empty:    {html: '\u2205', equipped: ["Void"]}
     },
     hero = {html: 'I', },
 
     items = {
         Dagger:  {damage: 4},
         Sword:   {damage: 8},
+        Mitre:   {damage: 10},
+        Fang:    {damage: 3},
+        Bong:    {damage: 5},
+        Pick:    {damage: 7},
+        Void:    {damage: 12},
+        Modulo:  {damage: 8},
+        Tooth:   {damage: 1},
 
         Tunic:   {armor: 1},
         Leather: {armor: 2},
@@ -71,12 +81,13 @@ var mobs  = {
 function makeClass(Prototype, type, properties) {
     window[type] = function(options) {
         Prototype.call(this, properties, options);
+        this.kind = type.toLowerCase();
         this.name = type;
         this.classes.push(type.toLowerCase());
+        if (this.setup) { this.setup(); }
     };
     window[type].prototype = new Prototype();
     window[type].constructor = window[type];
-    if (this.setup) { this.setup(); }
 }
 
 for (var type in items) { makeClass(Item, type, items[type]); }

@@ -1,7 +1,7 @@
 function Square(options) {
     this.x = options.x;
     this.y = options.y;
-    this.visibility = 0;
+    this.visibility = 2;
     this.entity = options.entity || wall;
     this.level = options.level;
     this._span = undefined;
