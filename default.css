@@ -20,8 +20,8 @@ div#context .row { display: table-row; }
     line-height: 100%;
 }
 
-#help-screen { color: #999; height: 500; }
-#help-screen strong { color: #CCC; }
+#help-screen, #town-screen { color: #999; height: 500; }
+#help-screen strong, #town-screen strong { color: #CCC; }
 
 .status { color: #666; }
 .status .data { color: #CCC; }
@@ -48,3 +48,5 @@ div#context .row { display: table-row; }
 .blue { color: blue; }
 .available { color: red; }
 
+.aware { color: #F00; }
+.focused { color: #F9C; }

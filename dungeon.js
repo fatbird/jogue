@@ -1,6 +1,8 @@
 function Dungeon(options) {
     this.width = options.width;
     this.height = options.height;
+    this.maxX = this.width - 1;
+    this.maxY = this.height - 1;
     this.levels = [];
     this.currentLevel = undefined;
     this.levelIndex = undefined;
@@ -79,26 +81,94 @@ Dungeon.prototype.move = function(direction) {
         this.hero.square.add(this.hero);
         this.currentLevel.updateVisibility(this.hero.square);
     }
+    this.checkMobs();
     this.context.refresh();
+};
+var awareness = [
+    {x: -1, y: -1},
+    {x: 0,  y: -1},
+    {x: 1,  y: -1},
+    {x: -1, y: 0},
+    {x: 1,  y: 0},
+    {x: -1, y: 1},
+    {x: 0,  y: 1},
+    {x: 1,  y: 1},
+    {x: -2,  y: 0},
+    {x: 0, y: -2},
+    {x: 0, y: 2},
+    {x: 2, y: 0}
+];
+
+/**
+ * Check mob activity for movement or attacks
+ */
+Dungeon.prototype.checkMobs = function() {
+    awareness.forEach(function(d) {
+        var x = Math.min(Math.max(0, this.hero.square.x + d.x), this.maxX),
+            y = Math.min(Math.max(0, this.hero.square.y + d.y), this.maxY),
+            square = this.currentLevel.grid[x][y];
+        if (square.entity instanceof Mob) {
+            if (! square.entity.aware()) {
+                square.entity.aware(true);
+                square.entity.wait = true;
+            }
+        }
+    }, this);
+    this.currentLevel.mobs.forEach(function(mob) {
+        if (! mob.aware()) { return; }
+        if (mob.wait) { mob.wait = false; return; }
+        var dx = this.hero.square.x - mob.square.x,
+            dy = this.hero.square.y - mob.square.y,
+            nx = mob.square.x + Math.min(Math.max(dx, -1), 1),
+            ny = mob.square.y + Math.min(Math.max(dy, -1), 1);
+        if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {  // too far to attack, move
+            if (this.currentLevel.grid[nx][ny].isOpen()) {
+                if (random(0, 100) < 90) {   // small chance the mob falls behind
+                    mob.square.remove(mob);
+                    this.currentLevel.grid[nx][ny].add(mob);
+                }
+            } else {
+                if ([true, false].choice()) { mob.aware(false); }
+            }
+        } else {
+            this.defend(mob);
+        }
+    }, this);
 };
 
 /**
  * The hero attacks a mob
+ *
+ * Damage done is weapon damage, less a random factor that's equal to a number
+ * within the range of 0 to half the weapon's damage, reduced by the number of
+ * kills for the hero divided by a factor, rounded up.
  */
 Dungeon.prototype.attack = function(square) {
     var mob = square.entity,
         damage = this.hero.equipped.damage,
-        actual = damage - random(0, damage);
+        protection = mob.worn || mob.borne || {armor: 0},
+        randomness = random(0, damage / 2) - Math.ceil(this.hero.killed / 7),
+        actual = damage - randomness - protection.armor;
+    actual = actual < 0 ? 0 : actual;
+    mob.focused(true);
     if ([true, false].choice()) {
         context.add_message("You hit the {0} for {1} points of damage!"
                             .format(mob.kind, actual));
         mob.hp -= actual;
         if (mob.hp <= 0) {
+            this.currentLevel.mobs.remove(mob);
             context.add_message("You killed the {0}!".format(mob.kind));
+            this.hero.killed++;
             square.remove(mob);
+            square.removeClass(["focused", "aware"]);
             var item = new Pile();
             item.contains.push(new Gold({amount: mob.gold}));
-            if ([true, false].choice()) { item.contains.push(mob.equipped); }
+            if ([true, false].choice() && mob.equipped) {
+                item.contains.push(mob.equipped);
+            }
+            if ([true, false].choice() && mob.worn) {
+                item.contains.push(mob.worn);
+            }
             square.add(item);
             return;
         }
@@ -112,11 +182,11 @@ Dungeon.prototype.attack = function(square) {
  * A mob attacks the hero
  */
 Dungeon.prototype.defend = function(attacker) {
-    var damage = attacker.equipped.damage,
-        actual = damage - random(0, damage) - this.hero.worn.armor;
+    var arm = attacker.equipped || attacker.has,
+        actual = arm.damage - random(0, arm.damage) - this.hero.worn.armor;
     if ([true, false].choice() && actual > 0) {
-        context.add_message("The {0} hits you for {1} points of damage!"
-                            .format(attacker.kind, actual));
+        context.add_message("The {0} hits you for {1} points of damage with a {2}!"
+                            .format(attacker.kind, actual, arm.kind));
         this.hero.hp -= actual;
         if (this.hero.hp <= 0) {
             context.currentScreen = context.gameOverScreen;
@@ -173,7 +243,6 @@ Dungeon.prototype.activate = function() {
  * Leave the dungeon by staircase
  */
 Dungeon.prototype.exit = function() {
-    if (! this.hero) { this.hero = this.context.hero; }
     var loc = "entry";
     if (this.hero.square.x === this.currentLevel.entry.x &&
         this.hero.square.y === this.currentLevel.entry.y) {
@@ -190,13 +259,19 @@ Dungeon.prototype.exit = function() {
     } else {
         return;
     }
-    if (this.levelIndex < 0) { this.context.town(); return; }
+    // reset mob focus and awareness
+    this.currentLevel.resetMobs(true);
+    if (this.levelIndex < 0) {
+        this.context.town();
+        return;
+    }
     this.currentLevel = this.levels[this.levelIndex];
     window.level = this.currentLevel;
     if (level.level > this.hero.level) {
         this.hero.level++;
-        this.hero.hp += random(5, 10);
-        this.hero.max_hp = this.hero.hp;
+        var increase = random(5, 10);
+        this.hero.hp += increase;
+        this.hero.max_hp += increase;
     }
     for (var ii = 0; ii < this.levels.length; ++ii) {
         if (ii === this.levelIndex) { continue; }

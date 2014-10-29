@@ -1,7 +1,7 @@
 function Square(options) {
     this.x = options.x;
     this.y = options.y;
-    this.visibility = 2;
+    this.visibility = 3;
     this.entity = options.entity || wall;
     this.level = options.level;
     this._span = undefined;
@@ -13,6 +13,14 @@ Square.prototype.add = function(entity) {
     this._previous.unshift(this.entity);
     this.entity.classes.forEach(function(cls) { this.removeClass(cls); }, this);
     this.entity = entity;
+    if (this.entity instanceof Mob) {
+        if (this.entity.aware()) { this.addClass("aware"); }
+        if (this.entity.focused()) {
+            this.removeClass("aware");
+            this.addClass("focused");
+        }
+    }
+    this.entity.square = this;
     this.entity.classes.forEach(function(cls) { this.addClass(cls); }, this);
     this.span().innerHTML = entity.html;
 };
@@ -23,6 +31,10 @@ Square.prototype.last = function() {
 
 Square.prototype.remove = function(entity) {
     this.entity.classes.forEach(function(cls) { this.removeClass(cls); }, this);
+    if (this.entity instanceof Mob) {
+        this.entity.square = undefined;
+        this.removeClass(["focused", "aware"]);
+    }
     this.entity = this._previous.shift();
     this.entity.classes.forEach(function(cls) { this.addClass(cls); }, this);
     this.span().innerHTML = this.entity.html;
@@ -55,17 +67,23 @@ Square.prototype.updateVisibility = function(level) {
 };
 
 Square.prototype.addClass = function(cls) {
-    if (this._classes.indexOf(cls) === -1) {
-        this._classes.push(cls);
-        this.span().className = this._classes.join(" ");
+    if (! (cls instanceof Array)) { cls = [cls]; }
+    for (var ii = 0; ii < cls.length; ++ii) {
+        if (this._classes.indexOf(cls[ii]) === -1) {
+            this._classes.push(cls[ii]);
+        }
     }
+    this.span().className = this._classes.join(" ");
 };
 
 Square.prototype.removeClass = function(cls) {
-    if ((ii = this._classes.indexOf(cls)) > -1) {
-        this._classes.splice(ii, 1);
-        this.span().className = this._classes.join(" ");
+    if (! (cls instanceof Array)) { cls = [cls]; }
+    for (var ii = 0; ii < cls.length; ++ii) {
+        if ((jj = this._classes.indexOf(cls[ii])) > -1) {
+            this._classes.splice(jj, 1);
+        }
     }
+    this.span().className = this._classes.join(" ");
 };
 
 Square.prototype.getOpenAdjacent = function() {
@@ -117,6 +135,13 @@ Square.prototype.markAvailableWalls = function(dir) {
     this.level.available[id] = {wall: contender, dir: dir};
     //contender.addClass("available");
     return true;
+};
+
+Square.prototype.isOpen = function() {
+    return (this.entity === floor ||
+            this.entity instanceof Item ||
+            this.entity === up ||
+            this.entity === down);
 };
 
 Square.prototype.id = function() { return this.x + "," + this.y; };

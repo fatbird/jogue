@@ -59,13 +59,14 @@ Level.prototype.getRoomParameters = function() {
 Level.prototype.generateLevel = function() {
     this.entry = this.grid[this.start.x][this.start.y];
     var params = this.getRoomParameters(),
-        max_attempts = 60,
+        max_attempts = 60,  // 60
         max_rooms = 15,
         num_rooms = 1,
-        max_mobs = 20,
-        max_items = 4,
+        max_mobs = 10,
+        max_items = 5,
         mob, item, loc, xy;
     this.addRoom(this.entry, params.dir, params.lat, params.lng);
+    //this.addRoom(this.grid[1][12], 'e', {min:10, max:10}, {min:20, max:20});
     for (var ii = 0; ii < max_attempts && num_rooms < max_rooms; ++ii) {
         var keys = Object.keys(this.available),
             available = this.available[keys.choice()],
@@ -116,10 +117,9 @@ Level.prototype.generateItem = function() {
         }
         if ([true, false, item.name === "Chest"].choice()) {
             var obj = this.generateItem();
-            if (obj !== Gold) { item.contains.push(this.generateItem()); }
+            if (obj !== Gold) { item.contains.push(obj); }
         }
     }
-    if (item.setup) { item.setup(); }
     return item;
 };
 
@@ -245,6 +245,11 @@ Level.prototype.updateVisibility = function(square) {
         }
     }
 };
+
+Level.prototype.resetMobs = function(resetFocus) {
+    this.mobs.forEach(function(mob) { mob.reset(resetFocus); });
+};
+
 
 
 

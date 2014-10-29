@@ -118,14 +118,14 @@ var helpText = "\n" +
     "class='stairs'>\u2193</span>) carry you between levels!\n" +
     "    \n" +
     "    Messages:\n" +
-    "      <strong>y</strong>  To scroll down\n" +
-    "      <strong>h</strong>  To scroll up\n" +
-    "      <strong>n</strong>  To delete the current message\n" +
+    "      <strong>t</strong>  To scroll down\n" +
+    "      <strong>g</strong>  To scroll up\n" +
+    "      <strong>b</strong>  To delete the current message\n" +
     "    \n" +
     "    <strong>?</strong>  To go back to the dungeon\n" +
-    "\n";
+    "\n",
 
-var gameOverText = "\n" +
+    gameOverText = "\n" +
     "    \n" +
     "    You died on level {0}, killed by a {1}.\n" +
     "    \n" +
@@ -134,5 +134,11 @@ var gameOverText = "\n" +
     "    Hit <strong>r</strong> to start over.\n" +
     "    \n" +
     "    The lozenge of power is still down there...\n" +
-    "\n";
+    "\n",
 
+    townText = "\n" +
+    "    \n" +
+    "    This is where the town would go if one existed.\n" +
+    "    \n" +
+    "    Hit <strong>k</strong> to return to the dungeon.\n" +
+    "\n";

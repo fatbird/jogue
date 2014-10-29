@@ -12,17 +12,19 @@ function Context(options) {
                                 height: this.height,
                                 context: this});
     this.element.appendChild(this.dungeonScreen.element);
-    this.dungeon.addLevel({x: Math.floor(this.width / 2),
-                           y: Math.floor(this.height / 2)},
-                          this.dungeonScreen.element);
+    var start = {x: Math.floor(this.width / 2), y: Math.floor(this.height / 2)};
+    //start = {x: 1, y: 12};
+    this.dungeon.addLevel(start, this.dungeonScreen.element);
     this.hero = new Hero();
-    this.hero.square = this.dungeon.currentLevel.grid[Math.floor(this.width/2)]
-                                                     [Math.floor(this.height/2)];
+    this.hero.square = this.dungeon.currentLevel.entry;
     this.hero.square.add(this.hero);
-    this.hero.inventory.push(Object.create(new Dagger()));
+    //this.hero.inventory.push(Object.create(new Dagger()));
+    this.hero.inventory.push(Object.create(new Void()));
     this.hero.equipped = this.hero.inventory.last();
-    this.hero.inventory.push(Object.create(new Tunic()));
+    //this.hero.inventory.push(Object.create(new Tunic()));
+    this.hero.inventory.push(Object.create(new Plate({level: 5})));
     this.hero.worn = this.hero.inventory.last();
+    this.hero.killed = 0;
     this.hero.regenerate = function() {
         if (random(0, 100) < 20 && context.hero.hp < context.hero.max_hp) {
             context.hero.hp += 1;
@@ -35,6 +37,11 @@ function Context(options) {
                                   id: "help-screen", content: helpText});
     this.helpScreen.element.style.display = "none";
     this.element.appendChild(this.helpScreen.element);
+
+    this.townScreen = new Screen({width: this.width, height: this.height,
+                                  id: "town-screen", content: townText});
+    this.townScreen.element.style.display = "none";
+    this.element.appendChild(this.townScreen.element);
 
     this.gameOverScreen = new Screen({width: this.width, height: this.height,
                                       id: "help-screen"});
@@ -102,17 +109,23 @@ Context.prototype.handleInput = function(event) {
     case "k":  // "use" object in current square
         if (context.currentScreen === context.dungeonScreen) {
             context.dungeon.activate();
+            context.dungeon.checkMobs();
+        } else if (context.currentScreen === context.townScreen) {
+            context.currentScreen.element.style.display = "none";
+            context.currentScreen = context.dungeonScreen;
+            context.currentScreen.element.style.display = "block";
+            context.dungeon.currentLevel.entry.add(context.hero);
         }
         break;
-    case "h":  // scrolling messages up i.e., back through earlier messages
+    case "g":  // scrolling messages up i.e., back through earlier messages
         if (context.message_idx + 1 < context.messages.length) {
             ++context.message_idx;
         }
         break;
-    case "y":  // scrolling messages down i.e., to latest messages
+    case "t":  // scrolling messages down i.e., to latest messages
         if (context.message_idx > 0) { --context.message_idx; }
         break;
-    case "n":  // delete current messages
+    case "b":  // delete current messages
         context.messages.splice(context.message_idx, 1);
         context.message_idx = Math.min(context.message_idx,
                                        context.messages.length - 1);
@@ -156,5 +169,9 @@ Context.prototype.getChar = function(event) {
     }
 };
 
-
+Context.prototype.town = function() {
+    context.currentScreen.element.style.display = "none";
+    context.currentScreen = context.townScreen;
+    context.currentScreen.element.style.display = "block";
+};
 

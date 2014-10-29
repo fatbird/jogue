@@ -7,6 +7,9 @@ function Mob(properties, options) {
     this.worn = undefined;
     this.gold = 0;
     this.level = 1;
+    this.square = undefined;
+    this._aware = false;
+    this._focused = false;
 
     properties = properties || {};
     options = options || {};
@@ -19,13 +22,51 @@ function Mob(properties, options) {
             this.gold += random(0, 10);
         }
         this.max_hp = this.hp;
-        if (this.equipped instanceof Array) {
-            this.equipped = new window[this.equipped.choice()]();
-            this.equipped.level = this.level;
-            this.equipped.damage *= this.level;
-        }
+        ["equipped", "has", "worn", "borne"].forEach(function(property) {
+            if (this[property] instanceof Array) {
+                var choice = this[property].choice();
+                this[property] = new window[choice]({level: this.level});
+            }
+        }, this);
     };
+
 }
+
+/**
+ * Focus means the mob is focused on killing the hero.  Focus is only reset
+ * when the hero leaves the level.
+ */
+Mob.prototype.focused = function(set) {
+    if (set !== undefined) {
+        this._focused = !! set;
+        this._aware = !! set;
+        if (this._focused) {
+            this.square.addClass(["focused"]);
+            this.square.removeClass(["aware"]);
+        }
+        else { this.square.removeClass(["focused"]); }
+    }
+    return this._focused;
+};
+
+/**
+ * Awareness means the mob is weakly focused on killing the hero.  If the mob
+ * is focused, the mob is aware and its awareness is not reset; if the mob is
+ * not focused, awareness is reset by the hero running away.
+ */
+Mob.prototype.aware = function(set) {
+    if (set !== undefined && ! this._focused) {
+        this._aware = !! set;
+        if (this._aware) { this.square.addClass("aware"); }
+        else { this.square.removeClass("aware"); }
+    }
+    return this._aware;
+};
+
+Mob.prototype.reset = function(resetFocus) {
+    if (resetFocus !== undefined) { this._focused = !! resetFocus; }
+    this.aware(false);
+};
 
 function Item(properties, options) {
     this.html = '';
@@ -41,8 +82,12 @@ function Item(properties, options) {
     for (var opt in options) { this[opt] = options[opt]; }
 
     this.setup = function() {
-        if (this.damage) { this.damage *= this.level; }
-        if (this.armor) { this.armor *= this.level; }
+        if (this.damage) {
+            this.damage = (this.damage - random(0, this.damage / 2)) * this.level;
+        }
+        if (this.armor) {
+            this.armor = (this.armor - random(0, this.armor / 2)) * this.level;
+        }
         if (this.name && (this.damage || this.armor)) {
             this.name = "{0} ({1})".format(this.name, (this.damage || this.armor));
         }
@@ -50,14 +95,20 @@ function Item(properties, options) {
 }
 
 var mobs  = {
-        Bard:     {html: '\u266a', equipped: ["Dagger", "Sword"]},
-        Snake:    {html: '\u2621', equipped: ["Fang"]},
-        Skull:    {html: '\u2620', equipped: ["Tooth"]},
-        Bishop:   {html: '\u2657', equipped: ["Mitre", "Dagger"]},
-        Hippie:   {html: '\u2672', equipped: ["Bong"]},
-        Dwarf:    {html: '\u2692', equipped: ["Pick", "Sword"]},
-        Cuberoot: {html: '\u221b', equipped: ["Modulo"]},
-        Empty:    {html: '\u2205', equipped: ["Void"]}
+        Bard:     {html: '\u266a',
+                   equipped: ["Dagger", "Sword"],
+                   worn: ["Tunic", "Leather"]},
+        Snake:    {html: '\u2621', has: ["Fang"]},
+        Skull:    {html: '\u2620', has: ["Tooth"], borne: ["Bone"]},
+        Bishop:   {html: '\u2657',
+                   equipped: ["Mitre", "Dagger"],
+                   worn: ["Tunic"]},
+        Dwarf:    {html: '\u2692',
+                   equipped: ["Pick", "Sword"],
+                   worn: ["Studded", "Scale", "Chain", "Plate"]},
+        Cuberoot: {html: '\u221b', equipped: ["Modulo"],
+                   borne: ["Indivisibility"]},
+        Empty:    {html: '\u2205', has: ["Void"], borne: ["Haze"]}
     },
     hero = {html: 'I', },
 
@@ -72,11 +123,15 @@ var mobs  = {
         Modulo:  {damage: 8},
         Tooth:   {damage: 1},
 
-        Tunic:   {armor: 1},
-        Leather: {armor: 2},
-        Studded: {armor: 3},
-        Scale:   {armor: 4},
-        Chain:   {armor: 5},
+        Tunic:          {armor: 1},
+        Leather:        {armor: 2},
+        Bone:           {armor: 2},
+        Studded:        {armor: 3},
+        Haze:           {armor: 3},
+        Scale:          {armor: 4},
+        Chain:          {armor: 5},
+        Plate:          {armor: 8},
+        Indivisibility: {armor: 4},
 
         Gold:    {amount: 0},
 
