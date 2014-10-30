@@ -1,0 +1,27 @@
+{
+  "name": "jogue",
+  "version": "0.1.0",
+  "description": "A JavaScript Roguelike",
+  "main": "jogue.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fatbird/jogue.git"
+  },
+  "keywords": [
+    "javascript",
+    "rogue",
+    "roguelike"
+  ],
+  "author": "Justin Johnson",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/fatbird/jogue/issues"
+  },
+  "homepage": "https://github.com/fatbird/jogue",
+  "devDependencies": {
+    "grunt": "^0.4.5"
+  }
+}
