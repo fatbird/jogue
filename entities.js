@@ -139,6 +139,9 @@ var mobs  = {
         Pile:    {html: '\u2234', consumable: true, carryable: false}
     },
 
+    lozenge = {html: '\u22c4', consumable: true, carryable: true,
+               classes: ["item", "treasure"]},
+
     wall  = {html: ' ', classes: ['wall']},
     floor = {html: '\u203b', classes: ['floor']},
     up    = {html: '\u2191', classes: ['stairs']},
@@ -165,4 +168,5 @@ function makeClass(Prototype, type, properties) {
 for (var type in items) { makeClass(Item, type, items[type]); }
 for (var type in mobs) { makeClass(Mob, type, mobs[type]); }
 makeClass(Mob, "Hero", hero);
+makeClass(Item, "Lozenge", lozenge);
 

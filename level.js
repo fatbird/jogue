@@ -107,7 +107,9 @@ Level.prototype.generateLevel = function() {
     }
 
     if (this.level === config.lozenge_level) {
-
+        item = new Lozenge();
+        xy = this.open.draw().split(",");
+        this.grid[xy[0]][xy[1]].add(item);
     }
 };
 

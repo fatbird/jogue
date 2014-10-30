@@ -80,6 +80,7 @@ function Screen(options) {
     this.id = options.id;
     this.element = document.createElement("div");
     this.element.setAttribute("id", this.id);
+    this.element.className = "screen";
     if (options.content) {
         this.element.innerHTML = options.content;
     }
@@ -91,7 +92,10 @@ var context = null,
         // dungeon parameters
         height: 25,
         width: 50,
-        lozenge_level: 1,
+        lozenge_level: 10,
+        initial_visibility: 0,
+        weapon: "Sword",
+        armor: "Scale",
 
         // room generation
         max_attempts: 60,
@@ -167,7 +171,7 @@ var helpText = "\n" +
     "    \n" +
     "    And made {0} gold along the way.\n" +
     "    \n" +
-    "    Hit <strong>r</strong> to try again.\n" +
+    "    Reload the page to try again.\n" +
     "\n",
 
     townText = "\n" +

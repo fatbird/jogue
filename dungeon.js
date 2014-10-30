@@ -237,6 +237,12 @@ Dungeon.prototype.activate = function() {
                 context.add_message(square.last().name + " was empty");
             }
             square._previous.shift();
+        } else if (square.last().consumable && square.last().carryable) {
+            if (square.last() instanceof Lozenge) {
+                this.hero.inventory.push(square._previous.shift());
+                this.hero.has_lozenge = true;
+                context.showScreen("lozenge");
+            }
         }
     }
 };
@@ -249,7 +255,7 @@ Dungeon.prototype.exit = function() {
     if (this.hero.square.x === this.currentLevel.entry.x &&
         this.hero.square.y === this.currentLevel.entry.y) {
         --this.levelIndex;
-        this.hero.square.remove(this.hero);
+        if (this.levelIndex >= 0) { this.hero.square.remove(this.hero); }
         loc = "exit";
     } else if (this.hero.square.x === this.currentLevel.exit.x &&
                this.hero.square.y === this.currentLevel.exit.y) {

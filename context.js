@@ -20,11 +20,9 @@ function Context(options) {
     this.hero = new Hero();
     this.hero.square = this.dungeon.currentLevel.entry;
     this.hero.square.add(this.hero);
-    //this.hero.inventory.push(Object.create(new Dagger()));
-    this.hero.inventory.push(Object.create(new Void()));
+    this.hero.inventory.push(Object.create(new window[config.weapon]()));
     this.hero.equipped = this.hero.inventory.last();
-    //this.hero.inventory.push(Object.create(new Tunic()));
-    this.hero.inventory.push(Object.create(new Plate({level: 5})));
+    this.hero.inventory.push(Object.create(new window[config.armor]()));
     this.hero.worn = this.hero.inventory.last();
     this.hero.killed = 0;
     this.hero.regenerate = function() {
@@ -51,7 +49,7 @@ function Context(options) {
     this.element.appendChild(this.gameOverScreen.element);
 
     this.lozengeScreen = new Screen({width: this.width, height: this.height,
-                                     id: "lozenge-screen", content: victoryText});
+                                     id: "lozenge-screen", content: lozengeText});
     this.lozengeScreen.element.style.display = "none";
     this.element.appendChild(this.lozengeScreen.element);
 
@@ -101,8 +99,10 @@ Context.prototype.print_message = function() {
     var messages = '';
     for (var ii = 0; ii < 3; ++ii) {
         if (this.messages[ii + this.message_idx]) {
+            idx = ii + this.message_idx;
+            didx = this.messages.length - idx;
             messages += "<div class='" + msg_classes[ii] + "'>" +
-                        this.messages[ii + this.message_idx] + "</span>";
+                        (didx) + ". " + this.messages[idx] + "</span>";
         }
     }
     this.message_bar.innerHTML = messages;
@@ -134,7 +134,6 @@ Context.prototype.handleInput = function(event) {
             context.dungeon.checkMobs();
         } else {
             context.showScreen("dungeon");
-            context.dungeon.currentLevel.entry.add(context.hero);
         }
         break;
     case "g":  // scrolling messages up i.e., back through earlier messages
@@ -187,8 +186,11 @@ Context.prototype.getChar = function(event) {
 };
 
 Context.prototype.town = function() {
-    context.currentScreen.element.style.display = "none";
-    context.currentScreen = context.townScreen;
-    context.currentScreen.element.style.display = "block";
+    if (this.hero.has_lozenge) {
+        this.victoryScreen.element.innerHTML = victoryText.format(this.hero.gold);
+        this.showScreen("victory");
+    } else {
+        this.showScreen("town");
+    }
 };
 
