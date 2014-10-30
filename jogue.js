@@ -86,12 +86,27 @@ function Screen(options) {
 }
 
 
-var context = null;
+var context = null,
+    config = {
+        // dungeon parameters
+        height: 25,
+        width: 50,
+        lozenge_level: 1,
+
+        // room generation
+        max_attempts: 60,
+        max_rooms: 15,
+        max_mobs: 10,
+        max_items: 5,
+
+        element: document.createElement("div")
+    };
 function init() {
-    context = new Context({element: document.createElement("div"),
-                           height: 25,
-                           width: 50});
-    document.getElementById("context").appendChild(context.element);
+    context = new Context(config);
+    var node = document.createElement("div");
+    node.setAttribute("id", "context");
+    document.body.insertBefore(node, document.body.firstChild);
+    node.appendChild(context.element);
     document.onkeypress = context.handleInput;
     context.add_message("Initialization complete!");
     context.refresh();
@@ -131,9 +146,28 @@ var helpText = "\n" +
     "    \n" +
     "    You had {2} gold, a {3}, and {4} armor.\n" +
     "    \n" +
-    "    Hit <strong>r</strong> to start over.\n" +
+    "    Reload the page to start over.\n" +
     "    \n" +
     "    The lozenge of power is still down there...\n" +
+    "\n",
+
+    lozengeText = "\n" +
+    "    \n" +
+    "    You found the lozenge of power!  Your nagging cough will soon be " +
+    "vanquished...\n" +
+    "    \n" +
+    "    if you make it back to town.\n" +
+    "    \n" +
+    "    Hit <strong>k</strong> to continue.\n" +
+    "\n",
+
+    victoryText = "\n" +
+    "    \n" +
+    "    You found the lozenge of power, and brought it back to civilization!\n" +
+    "    \n" +
+    "    And made {0} gold along the way.\n" +
+    "    \n" +
+    "    Hit <strong>r</strong> to try again.\n" +
     "\n",
 
     townText = "\n" +

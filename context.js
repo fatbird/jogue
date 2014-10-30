@@ -4,6 +4,7 @@ function Context(options) {
     this.width = options.width;
     this.messages = [];
     this.message_idx = undefined;
+    this.options = options;
     this.dungeonScreen = new Screen({width: this.width,
                                       height: this.height,
                                       id: "dungeon-screen"});
@@ -13,7 +14,8 @@ function Context(options) {
                                 context: this});
     this.element.appendChild(this.dungeonScreen.element);
     var start = {x: Math.floor(this.width / 2), y: Math.floor(this.height / 2)};
-    //start = {x: 1, y: 12};
+    start = {x: random(2, this.dungeon.maxX - 2),
+             y: random(2, this.dungeon.maxY - 2)};
     this.dungeon.addLevel(start, this.dungeonScreen.element);
     this.hero = new Hero();
     this.hero.square = this.dungeon.currentLevel.entry;
@@ -44,9 +46,23 @@ function Context(options) {
     this.element.appendChild(this.townScreen.element);
 
     this.gameOverScreen = new Screen({width: this.width, height: this.height,
-                                      id: "help-screen"});
+                                      id: "game-over-screen"});
     this.gameOverScreen.element.style.display = "none";
     this.element.appendChild(this.gameOverScreen.element);
+
+    this.lozengeScreen = new Screen({width: this.width, height: this.height,
+                                     id: "lozenge-screen", content: victoryText});
+    this.lozengeScreen.element.style.display = "none";
+    this.element.appendChild(this.lozengeScreen.element);
+
+    this.victoryScreen = new Screen({width: this.width, height: this.height,
+                                      id: "victory-screen"});
+    this.victoryScreen.element.style.display = "none";
+    this.element.appendChild(this.victoryScreen.element);
+
+    this.blankScreen = new Screen({width: this.width, height: this.height});
+    this.blankScreen.element.style.display = "none";
+    this.element.appendChild(this.blankScreen.element);
 
     this.status_bar = document.createElement("div");
     this.status_bar.className = "status";
@@ -57,6 +73,12 @@ function Context(options) {
     this.element.appendChild(this.message_bar);
 
 }
+
+Context.prototype.showScreen = function(name) {
+    this.currentScreen.element.style.display = "none";
+    this.currentScreen = this[name + "Screen"];
+    this.currentScreen.element.style.display = "block";
+};
 
 Context.prototype.refresh = function() {
     this.print_status();
@@ -110,10 +132,8 @@ Context.prototype.handleInput = function(event) {
         if (context.currentScreen === context.dungeonScreen) {
             context.dungeon.activate();
             context.dungeon.checkMobs();
-        } else if (context.currentScreen === context.townScreen) {
-            context.currentScreen.element.style.display = "none";
-            context.currentScreen = context.dungeonScreen;
-            context.currentScreen.element.style.display = "block";
+        } else {
+            context.showScreen("dungeon");
             context.dungeon.currentLevel.entry.add(context.hero);
         }
         break;
@@ -131,33 +151,30 @@ Context.prototype.handleInput = function(event) {
                                        context.messages.length - 1);
         break;
     case "r":  // restart
-        if (context.currentScreen === context.gameOverScreen) {
+        if (false && context.currentScreen === context.gameOverScreen) {
+            context.showScreen("blank");
+            var container = document.getElementById("context");
+            document.body.removeChild(container);
             setTimeout(function() {
-                var container = document.getElementById("context");
-                while (container.firstChild) {
-                    container.removeChild(container.firstChild);
-                }
                 context = null;
                 init();
-            }, 100);
+            }, 10);
         }
         break;
     case "?":
         if (context.currentScreen === context.helpScreen) {
-            context.currentScreen = context.dungeonScreen;
-            context.helpScreen.element.style.display = "none";
+            context.showScreen("dungeon");
         } else {
-            context.currentScreen = context.helpScreen;
-            context.dungeonScreen.element.style.display = "none";
+            context.showScreen("help");
         }
-        context.currentScreen.element.style.display = "block";
         break;
     default:
-        //console.log(this.getChar(event || window.event));
         return true;
     }
-    context.hero.regenerate();
-    context.refresh();
+    if (context.currentScreen === context.dungeonScreen) {
+        context.hero.regenerate();
+        context.refresh();
+    }
     return false;
 };
 

@@ -3,6 +3,7 @@ function Level(options) {
     this.height = options.height;
     this.level = options.level;
     this.start = options.start;
+    this.dungeon = options.dungeon;
     this.element = document.createElement("div");
     this.grid = [];
     this.available = {};
@@ -45,11 +46,20 @@ Level.prototype.choice = function() {
     return arguments[this.random(0, arguments.length)];
 };
 
-
-Level.prototype.getRoomParameters = function() {
+Level.prototype.getRoomParameters = function(door) {
     var direction = this.choice("n", "w", "e", "s"),
         a = {min: this.random(2, 3), max: this.random(3, 8)},
-        b = {min: this.random(2, 4), max: this.random(4, 12)};
+        b = {min: this.random(2, 4), max: this.random(4, 12)},
+        ew = (door && door.x < this.width / 2) ? "e" : "w",
+        ns = (door && door.y < this.height / 2) ? "s" : "n";
+    if (door) {  // starting room, have to choose best direction
+        var cx = door.x / this.width,
+            cy = door.y / this.height;
+        cx = door.x > this.width / 2 ? 1 - cx : cx;
+        cy = door.y > this.height / 2 ? 1 - cy : cy;
+        direction = cx < cy ? ew : ns;
+        //console.log("{0} {1} {2} {3} {4}".format(door.x, door.y, cx, cy, direction));
+    }
     if (direction === "n" || direction === "s") {
         return {dir: direction, lat: b, lng: a};
     }
@@ -58,16 +68,12 @@ Level.prototype.getRoomParameters = function() {
 
 Level.prototype.generateLevel = function() {
     this.entry = this.grid[this.start.x][this.start.y];
-    var params = this.getRoomParameters(),
-        max_attempts = 60,  // 60
-        max_rooms = 15,
+    var params = this.getRoomParameters(this.entry),
         num_rooms = 1,
-        max_mobs = 10,
-        max_items = 5,
         mob, item, loc, xy;
     this.addRoom(this.entry, params.dir, params.lat, params.lng);
-    //this.addRoom(this.grid[1][12], 'e', {min:10, max:10}, {min:20, max:20});
-    for (var ii = 0; ii < max_attempts && num_rooms < max_rooms; ++ii) {
+    for (var ii = 0; ii < config.max_attempts &&
+                     num_rooms < config.max_rooms; ++ii) {
         var keys = Object.keys(this.available),
             available = this.available[keys.choice()],
             door = available.wall,
@@ -85,7 +91,7 @@ Level.prototype.generateLevel = function() {
     this.exit.add(down);
 
     // add mobs
-    for (var kk = 0; kk < max_mobs; ++kk) {
+    for (var kk = 0; kk < config.max_mobs; ++kk) {
         mob = this.generateMob();
         xy = this.open.draw().split(",");
         this.mobs.push(mob);
@@ -93,11 +99,15 @@ Level.prototype.generateLevel = function() {
     }
 
     // add items
-    for (var ll = 0; ll < max_items; ++ll) {
+    for (var ll = 0; ll < config.max_items; ++ll) {
         item = this.generateItem(["Chest", "Pile"].choice());
         xy = this.open.draw().split(",");
         this.items.push(item);
         this.grid[xy[0]][xy[1]].add(item);
+    }
+
+    if (this.level === config.lozenge_level) {
+
     }
 };
 

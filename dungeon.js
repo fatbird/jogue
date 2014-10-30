@@ -16,7 +16,9 @@ Dungeon.prototype.addLevel = function(start, parent) {
     this.levels.push(new Level({width: this.width,
                                 height: this.height,
                                 level: this.levels.length + 1,
-                                start: start}));
+                                start: start,
+                                dungeon: this,
+                                context: this.context}));
     parent.appendChild(this.levels[this.levels.length - 1].element);
     this.levels[this.levels.length - 1].generateLevel();
     if (this.currentLevel === undefined) {
@@ -103,6 +105,7 @@ var awareness = [
  * Check mob activity for movement or attacks
  */
 Dungeon.prototype.checkMobs = function() {
+    if (context.currentScreen !== context.dungeonScreen) { return; }
     awareness.forEach(function(d) {
         var x = Math.min(Math.max(0, this.hero.square.x + d.x), this.maxX),
             y = Math.min(Math.max(0, this.hero.square.y + d.y), this.maxY),
@@ -175,7 +178,6 @@ Dungeon.prototype.attack = function(square) {
     } else {
         context.add_message("You miss the {0}.".format(mob.name));
     }
-    this.defend(mob);
 };
 
 /**
