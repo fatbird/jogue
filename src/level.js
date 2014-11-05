@@ -1,3 +1,7 @@
+"use strict";  // jshint ignore:line
+/* global document, Square, config, window */
+/* global up, down, mobs, items, Gold, Lozenge, floor, wall */
+
 function Level(options) {
     this.width = options.width;
     this.height = options.height;
@@ -163,7 +167,8 @@ Level.prototype.addRoom = function(door, dir, lat, lng) {
         ldir = lat_choices[Number(dz === 1)],
         nw = dir + ldir,
         se = dir + lat_choices[Number(dz === -1)],
-        room = {};
+        room = {},
+        ii, kk, xx, yy;
     for (ii = 0; ii < lat_choices.length; ++ii) {
         room[lat_choices[ii]] = door[dir];
         room[lng_choices[ii]] = door[dir];

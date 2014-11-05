@@ -1,3 +1,7 @@
+"use strict";  // jshint ignore:line
+/* global Level, window, context, random, Mob, Pile, Gold, Item, Lozenge */
+/* global wall, floor, up, down, gameOverText */
+
 function Dungeon(options) {
     this.width = options.width;
     this.height = options.height;
@@ -33,7 +37,7 @@ var N = 'i', NE = 'o', E = 'l', SE = '.', S = ',', SW = 'm', W = 'j', NW = 'u';
 Dungeon.prototype.move = function(direction) {
     if (this.hero === undefined) { this.hero = this.context.hero; }
     var new_position = {x: this.hero.square.x, y: this.hero.square.y};
-    allowed = false;
+    var allowed = false;
     switch(direction) {
     case N:
         new_position.y -= 1;
@@ -105,7 +109,7 @@ var awareness = [
  * Check mob activity for movement or attacks
  */
 Dungeon.prototype.checkMobs = function() {
-    if (context.currentScreen !== context.dungeonScreen) { return; }
+    if (context.currentScreen !== context.screens.dungeon) { return; }
     awareness.forEach(function(d) {
         var x = Math.min(Math.max(0, this.hero.square.x + d.x), this.maxX),
             y = Math.min(Math.max(0, this.hero.square.y + d.y), this.maxY),
@@ -191,12 +195,12 @@ Dungeon.prototype.defend = function(attacker) {
                             .format(attacker.kind, actual, arm.kind));
         this.hero.hp -= actual;
         if (this.hero.hp <= 0) {
-            context.currentScreen = context.gameOverScreen;
-            context.gameOverScreen.element.innerHTML = gameOverText.format(
-                level.level, attacker.kind, this.hero.gold,
+            context.currentScreen = context.screens.gameOver;
+            context.screens.gameOver.element.innerHTML = gameOverText.format(
+                this.currentLevel.level, attacker.kind, this.hero.gold,
                 this.hero.equipped, this.hero.worn
             );
-            context.dungeonScreen.element.style.display = "none";
+            context.screens.dungeon.element.style.display = "none";
             context.currentScreen.element.style.display = "block";
         }
     } else {
@@ -213,7 +217,7 @@ Dungeon.prototype.activate = function() {
     if (square.last().constructor === Item) {
         if (square.last().consumable && ! square.last().carryable) {
             var items = square.last().contains.slice(),
-                found = false;
+                found = false, item;
             while (item = items.shift()) {  // jshint ignore:line
                 if ((item.armor || 0) > this.hero.worn.armor) {
                     this.hero.worn = item;
@@ -274,8 +278,7 @@ Dungeon.prototype.exit = function() {
         return;
     }
     this.currentLevel = this.levels[this.levelIndex];
-    window.level = this.currentLevel;
-    if (level.level > this.hero.level) {
+    if (this.currentLevel.level > this.hero.level) {
         this.hero.level++;
         var increase = random(5, 10);
         this.hero.hp += increase;

@@ -1,3 +1,6 @@
+"use strict";  // jshint ignore:line
+/* global Context, document */
+
 /**
  * Return a random integer within min/max bounds; if not specified, min
  * defaults to 0 and max defaults to the length of the array.
@@ -23,7 +26,8 @@ Array.prototype.choice = function() { return this[this.random()]; };
  * Remove the item if found, return boolean indicating actual removal.
  */
 Array.prototype.remove = function(item) {
-    if ((ii = this.indexOf(item)) > -1) { return !! this.splice(ii, 1); }
+    var index = this.indexOf(item);
+    if (index > -1) { return !! this.splice(index, 1); }
     return false;
 };
 
@@ -61,6 +65,11 @@ String.prototype.rpad = function(length, classes) {
     return string;
 };
 
+/**
+ * Return the string with {x} placeholders replaced by their ordinal match in
+ * the arguments list; if arguments run out before ordinals, no replacement
+ * occurs, leaving the placeholder.
+ */
 String.prototype.format = function() {
     var args = arguments;
     return this.replace(/{(\d+)}/g, function(match, number) {
@@ -71,50 +80,8 @@ String.prototype.format = function() {
 /**
  * Return the object's name attribute if it has one, standard string otherwise
  */
-Object.prototype.toString = function() { return this.name || "[object Object]"; };
+Object.prototype.toString = function() { return this.name || String({}); };
 
-
-function Screen(options) {
-    this.height = options.height;
-    this.width = options.width;
-    this.id = options.id;
-    this.element = document.createElement("div");
-    this.element.setAttribute("id", this.id);
-    this.element.className = "screen";
-    if (options.content) {
-        this.element.innerHTML = options.content;
-    }
-}
-
-
-var context = null,
-    config = {
-        // dungeon parameters
-        height: 25,
-        width: 50,
-        lozenge_level: 10,
-        initial_visibility: 0,
-        weapon: "Sword",
-        armor: "Scale",
-
-        // room generation
-        max_attempts: 60,
-        max_rooms: 15,
-        max_mobs: 10,
-        max_items: 5,
-
-        element: document.createElement("div")
-    };
-function init() {
-    context = new Context(config);
-    var node = document.createElement("div");
-    node.setAttribute("id", "context");
-    document.body.insertBefore(node, document.body.firstChild);
-    node.appendChild(context.element);
-    document.onkeypress = context.handleInput;
-    context.add_message("Initialization complete!");
-    context.refresh();
-}
 
 var helpText = "\n" +
     "    \n" +
@@ -180,3 +147,40 @@ var helpText = "\n" +
     "    \n" +
     "    Hit <strong>k</strong> to return to the dungeon.\n" +
     "\n";
+
+var context = null,
+    screens = {
+        dungeon: undefined,
+        town: townText,
+        help: helpText,
+        gameOver: undefined,
+        lozenge: lozengeText,
+        victory: undefined,
+        blank: undefined
+    },
+    config = {
+        screens: screens,
+        // dungeon parameters
+        height: 25,
+        width: 50,
+        lozenge_level: 10,
+        initial_visibility: 0,
+        weapon: "Sword",
+        armor: "Scale",
+
+        // room generation
+        max_attempts: 60,
+        max_rooms: 15,
+        max_mobs: 10,
+        max_items: 5,
+    };
+
+function init() {
+    context = new Context(config);
+    document.body.insertBefore(context.element, document.body.firstChild);
+    document.onkeypress = context.handleInput;
+    context.add_message("Initialization complete!");
+    context.refresh();
+}
+
+

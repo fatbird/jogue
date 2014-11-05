@@ -1,27 +1,44 @@
-var Context = (function() {
-    return {
-    };
-}());
+"use strict";  // jshint ignore:line
+/* global Dungeon, document, random, Hero, window, config, context */
 
+/**
+ * A screen-like container for conveniently flipping screens of content
+ */
+function Screen(content) {
+    this.element = document.createElement("div");
+    this.element.className = "screen";
+    this.element.style.display = "none";
+    this.element.innerHTML = content || "";
+}
+
+/**
+ * A gamewide context container
+ */
 function Context(options) {
-    this.element = options.element;
+    this.element = document.createElement("div");
+    this.element.setAttribute("id", "context");
     this.height = options.height;
     this.width = options.width;
     this.messages = [];
     this.message_idx = undefined;
     this.options = options;
-    this.dungeonScreen = new Screen({width: this.width,
-                                      height: this.height,
-                                      id: "dungeon-screen"});
-    this.currentScreen = this.dungeonScreen;
+
+    this.screens = {};
+    for (var name in options.screens || {}) {
+        this.screens[name] = new Screen(options.screens[name]);
+        this.element.appendChild(this.screens[name].element);
+    }
+
     this.dungeon = new Dungeon({width: this.width,
                                 height: this.height,
                                 context: this});
-    this.element.appendChild(this.dungeonScreen.element);
+    this.element.appendChild(this.screens.dungeon.element);
+    this.currentScreen = this.screens.dungeon;
     var start = {x: Math.floor(this.width / 2), y: Math.floor(this.height / 2)};
     start = {x: random(2, this.dungeon.maxX - 2),
              y: random(2, this.dungeon.maxY - 2)};
-    this.dungeon.addLevel(start, this.dungeonScreen.element);
+    this.dungeon.addLevel(start, this.screens.dungeon.element);
+
     this.hero = new Hero();
     this.hero.square = this.dungeon.currentLevel.entry;
     this.hero.square.add(this.hero);
@@ -38,35 +55,6 @@ function Context(options) {
     this.dungeon.currentLevel.updateVisibility(this.hero.square);
     this.dungeon.hero = this.hero;
 
-    this.helpScreen = new Screen({width: this.width, height: this.height,
-                                  id: "help-screen", content: helpText});
-    this.helpScreen.element.style.display = "none";
-    this.element.appendChild(this.helpScreen.element);
-
-    this.townScreen = new Screen({width: this.width, height: this.height,
-                                  id: "town-screen", content: townText});
-    this.townScreen.element.style.display = "none";
-    this.element.appendChild(this.townScreen.element);
-
-    this.gameOverScreen = new Screen({width: this.width, height: this.height,
-                                      id: "game-over-screen"});
-    this.gameOverScreen.element.style.display = "none";
-    this.element.appendChild(this.gameOverScreen.element);
-
-    this.lozengeScreen = new Screen({width: this.width, height: this.height,
-                                     id: "lozenge-screen", content: lozengeText});
-    this.lozengeScreen.element.style.display = "none";
-    this.element.appendChild(this.lozengeScreen.element);
-
-    this.victoryScreen = new Screen({width: this.width, height: this.height,
-                                      id: "victory-screen"});
-    this.victoryScreen.element.style.display = "none";
-    this.element.appendChild(this.victoryScreen.element);
-
-    this.blankScreen = new Screen({width: this.width, height: this.height});
-    this.blankScreen.element.style.display = "none";
-    this.element.appendChild(this.blankScreen.element);
-
     this.status_bar = document.createElement("div");
     this.status_bar.className = "status";
     this.element.appendChild(this.status_bar);
@@ -75,11 +63,15 @@ function Context(options) {
     this.message_bar.className = "messages";
     this.element.appendChild(this.message_bar);
 
+    this.showScreen("dungeon");
 }
 
+/**
+ * Set the named screen to display
+ */
 Context.prototype.showScreen = function(name) {
     this.currentScreen.element.style.display = "none";
-    this.currentScreen = this[name + "Screen"];
+    this.currentScreen = this.screens[name];
     this.currentScreen.element.style.display = "block";
 };
 
@@ -89,13 +81,14 @@ Context.prototype.refresh = function() {
 };
 
 Context.prototype.print_status = function() {
-    var hero = this.hero.instance,
+    var hero = this.hero,
+        level = this.dungeon.levelIndex + 1,
         status = "HP: {0} E: {1} W: {2} G: {3}  Level: {4}           ? for help"
-                 .replace("{0}", String(this.hero.hp).rpad(4, "data"))
-                 .replace("{1}", String(this.hero.equipped).rpad(12, "data"))
-                 .replace("{2}", String(this.hero.worn).rpad(12, "data"))
-                 .replace("{3}", String(this.hero.gold).rpad(4, "data"))
-                 .replace("{4}", String(this.dungeon.levelIndex + 1).lpad(2, "data"));
+                 .replace("{0}", String(hero.hp).rpad(4, "data"))
+                 .replace("{1}", String(hero.equipped).rpad(12, "data"))
+                 .replace("{2}", String(hero.worn).rpad(12, "data"))
+                 .replace("{3}", String(hero.gold).rpad(4, "data"))
+                 .replace("{4}", String(level).lpad(2, "data"));
     this.status_bar.innerHTML = status;
 };
 
@@ -104,8 +97,8 @@ Context.prototype.print_message = function() {
     var messages = '';
     for (var ii = 0; ii < 3; ++ii) {
         if (this.messages[ii + this.message_idx]) {
-            idx = ii + this.message_idx;
-            didx = this.messages.length - idx;
+            var idx = ii + this.message_idx,
+                didx = this.messages.length - idx;
             messages += "<div class='" + msg_classes[ii] + "'>" +
                         (didx) + ". " + this.messages[idx] + "</span>";
         }
@@ -118,6 +111,7 @@ Context.prototype.add_message = function(message) {
     if (! this.message_idx) { this.message_idx = 0; }
 };
 
+/* global N, NE, E, SE, S, SW, W, NW, init */
 Context.prototype.handleInput = function(event) {
     var key = Context.prototype.getChar(event || window.event);
     switch (key) {
@@ -129,12 +123,12 @@ Context.prototype.handleInput = function(event) {
     case SW:
     case W:
     case NW:
-        if (context.currentScreen === context.dungeonScreen) {
+        if (context.currentScreen === context.screens.dungeon) {
             context.dungeon.move(key);
         }
         break;
     case "k":  // "use" object in current square
-        if (context.currentScreen === context.dungeonScreen) {
+        if (context.currentScreen === context.screens.dungeon) {
             context.dungeon.activate();
             context.dungeon.checkMobs();
         } else {
@@ -155,18 +149,18 @@ Context.prototype.handleInput = function(event) {
                                        context.messages.length - 1);
         break;
     case "r":  // restart
-        if (false && context.currentScreen === context.gameOverScreen) {
+        if (false && context.currentScreen === context.screens.gameOver) {
             context.showScreen("blank");
             var container = document.getElementById("context");
             document.body.removeChild(container);
-            setTimeout(function() {
-                context = null;
+            window.setTimeout(function() {
+                context = null;  // jshint ignore:line
                 init();
             }, 10);
         }
         break;
     case "?":
-        if (context.currentScreen === context.helpScreen) {
+        if (context.currentScreen === context.screens.help) {
             context.showScreen("dungeon");
         } else {
             context.showScreen("help");
@@ -175,7 +169,7 @@ Context.prototype.handleInput = function(event) {
     default:
         return true;
     }
-    if (context.currentScreen === context.dungeonScreen) {
+    if (context.currentScreen === context.screens.dungeon) {
         context.hero.regenerate();
         context.refresh();
     }
@@ -190,9 +184,13 @@ Context.prototype.getChar = function(event) {
     }
 };
 
+/**
+ * Placeholder for town functionality
+ */
+/* global victoryText */
 Context.prototype.town = function() {
     if (this.hero.has_lozenge) {
-        this.victoryScreen.element.innerHTML = victoryText.format(this.hero.gold);
+        this.screens.victory.element.innerHTML = victoryText.format(this.hero.gold);
         this.showScreen("victory");
     } else {
         this.showScreen("town");

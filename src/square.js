@@ -1,3 +1,6 @@
+"use strict";  // jshint ignore:line
+/* global config, wall, Mob, document, floor, Item, up, down */
+
 function Square(options) {
     this.x = options.x;
     this.y = options.y;
@@ -78,7 +81,7 @@ Square.prototype.addClass = function(cls) {
 
 Square.prototype.removeClass = function(cls) {
     if (! (cls instanceof Array)) { cls = [cls]; }
-    for (var ii = 0; ii < cls.length; ++ii) {
+    for (var ii = 0, jj; ii < cls.length; ++ii) {
         if ((jj = this._classes.indexOf(cls[ii])) > -1) {
             this._classes.splice(jj, 1);
         }

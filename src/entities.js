@@ -1,3 +1,6 @@
+"use strict";  // jshint ignore:line
+/* global random, window */
+
 function Mob(properties, options) {
     this.html = '';
     this.classes = ['mob'];
