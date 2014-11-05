@@ -1,0 +1,1329 @@
+<!-- d1a3cdc-dirty -->
+<html>
+<head>
+<title>IBRL</title>
+<style>
+body {
+  background: black;
+  font: normal 12pt "Source Code Pro", monospace;
+  font-weight: 300;
+  color: #333;
+}
+div#context {
+  display: table;
+  white-space: pre;
+  border-collapse: collapse;
+}
+div#context .row { display: table-row; }
+.grid {
+    display: table-cell;
+    width: 18px;
+    height: 20px;
+    background: #111;
+    text-align: center;
+    overflow: hidden;
+    line-height: 100%;
+}
+
+.screen { color: #999; height: 500; }
+.screen strong { color: #CCC; }
+
+.status { color: #666; }
+.status .data { color: #CCC; }
+
+.messages { color: #999; line-height: 1.2em; height: 3.6em;}
+.messages .first { }
+.messages .second { opacity: 0.7; }
+.messages .third { opacity: 0.5; }
+
+.wall { background: #555; font-weight: bold; }
+
+.floor { color: #191919; }
+.stairs { color: #CC9; }
+.mob { color: #990000; }
+.hero { color: #36c; font-weight: bold; }
+.item { color: #554433; }
+.treasure { color: #CCFF00; font-weight: bold; }
+.bold { font-weight: bold; }
+
+.pitch { opacity: 0; }
+.dark { opacity: 0.40; }
+.dim { opacity: 0.7; }
+.visible { opacity: 1; }
+.blue { color: blue; }
+.available { color: red; }
+
+.aware { color: #F00; }
+.focused { color: #F9C; }
+</style>
+<link href='http://fonts.googleapis.com/css?family=Source+Code+Pro:200,300,400,500,600,700,900&subset=latin,latin-ext' rel='stylesheet' type='text/css'>
+</head>
+<body>
+<script>
+"use strict";
+function Context(options) {
+    this.element = options.element;
+    this.height = options.height;
+    this.width = options.width;
+    this.messages = [];
+    this.message_idx = undefined;
+    this.options = options;
+    this.dungeonScreen = new Screen({width: this.width,
+                                      height: this.height,
+                                      id: "dungeon-screen"});
+    this.currentScreen = this.dungeonScreen;
+    this.dungeon = new Dungeon({width: this.width,
+                                height: this.height,
+                                context: this});
+    this.element.appendChild(this.dungeonScreen.element);
+    var start = {x: Math.floor(this.width / 2), y: Math.floor(this.height / 2)};
+    start = {x: random(2, this.dungeon.maxX - 2),
+             y: random(2, this.dungeon.maxY - 2)};
+    this.dungeon.addLevel(start, this.dungeonScreen.element);
+    this.hero = new Hero();
+    this.hero.square = this.dungeon.currentLevel.entry;
+    this.hero.square.add(this.hero);
+    this.hero.inventory.push(Object.create(new window[config.weapon]()));
+    this.hero.equipped = this.hero.inventory.last();
+    this.hero.inventory.push(Object.create(new window[config.armor]()));
+    this.hero.worn = this.hero.inventory.last();
+    this.hero.killed = 0;
+    this.hero.regenerate = function() {
+        if (random(0, 100) < 20 && context.hero.hp < context.hero.max_hp) {
+            context.hero.hp += 1;
+        }
+    };
+    this.dungeon.currentLevel.updateVisibility(this.hero.square);
+    this.dungeon.hero = this.hero;
+
+    this.helpScreen = new Screen({width: this.width, height: this.height,
+                                  id: "help-screen", content: helpText});
+    this.helpScreen.element.style.display = "none";
+    this.element.appendChild(this.helpScreen.element);
+
+    this.townScreen = new Screen({width: this.width, height: this.height,
+                                  id: "town-screen", content: townText});
+    this.townScreen.element.style.display = "none";
+    this.element.appendChild(this.townScreen.element);
+
+    this.gameOverScreen = new Screen({width: this.width, height: this.height,
+                                      id: "game-over-screen"});
+    this.gameOverScreen.element.style.display = "none";
+    this.element.appendChild(this.gameOverScreen.element);
+
+    this.lozengeScreen = new Screen({width: this.width, height: this.height,
+                                     id: "lozenge-screen", content: lozengeText});
+    this.lozengeScreen.element.style.display = "none";
+    this.element.appendChild(this.lozengeScreen.element);
+
+    this.victoryScreen = new Screen({width: this.width, height: this.height,
+                                      id: "victory-screen"});
+    this.victoryScreen.element.style.display = "none";
+    this.element.appendChild(this.victoryScreen.element);
+
+    this.blankScreen = new Screen({width: this.width, height: this.height});
+    this.blankScreen.element.style.display = "none";
+    this.element.appendChild(this.blankScreen.element);
+
+    this.status_bar = document.createElement("div");
+    this.status_bar.className = "status";
+    this.element.appendChild(this.status_bar);
+
+    this.message_bar = document.createElement("div");
+    this.message_bar.className = "messages";
+    this.element.appendChild(this.message_bar);
+
+}
+
+Context.prototype.showScreen = function(name) {
+    this.currentScreen.element.style.display = "none";
+    this.currentScreen = this[name + "Screen"];
+    this.currentScreen.element.style.display = "block";
+};
+
+Context.prototype.refresh = function() {
+    this.print_status();
+    this.print_message();
+};
+
+Context.prototype.print_status = function() {
+    var hero = this.hero.instance,
+        status = "HP: {0} E: {1} W: {2} G: {3}  Level: {4}           ? for help"
+                 .replace("{0}", String(this.hero.hp).rpad(4, "data"))
+                 .replace("{1}", String(this.hero.equipped).rpad(12, "data"))
+                 .replace("{2}", String(this.hero.worn).rpad(12, "data"))
+                 .replace("{3}", String(this.hero.gold).rpad(4, "data"))
+                 .replace("{4}", String(this.dungeon.levelIndex + 1).lpad(2, "data"));
+    this.status_bar.innerHTML = status;
+};
+
+var msg_classes = ["first", "second", "third"];
+Context.prototype.print_message = function() {
+    var messages = '';
+    for (var ii = 0; ii < 3; ++ii) {
+        if (this.messages[ii + this.message_idx]) {
+            idx = ii + this.message_idx;
+            didx = this.messages.length - idx;
+            messages += "<div class='" + msg_classes[ii] + "'>" +
+                        (didx) + ". " + this.messages[idx] + "</span>";
+        }
+    }
+    this.message_bar.innerHTML = messages;
+};
+
+Context.prototype.add_message = function(message) {
+    this.messages.unshift(message);
+    if (! this.message_idx) { this.message_idx = 0; }
+};
+
+Context.prototype.handleInput = function(event) {
+    var key = Context.prototype.getChar(event || window.event);
+    switch (key) {
+    case N:
+    case NE:
+    case E:
+    case SE:
+    case S:
+    case SW:
+    case W:
+    case NW:
+        if (context.currentScreen === context.dungeonScreen) {
+            context.dungeon.move(key);
+        }
+        break;
+    case "k":  // "use" object in current square
+        if (context.currentScreen === context.dungeonScreen) {
+            context.dungeon.activate();
+            context.dungeon.checkMobs();
+        } else {
+            context.showScreen("dungeon");
+        }
+        break;
+    case "g":  // scrolling messages up i.e., back through earlier messages
+        if (context.message_idx + 1 < context.messages.length) {
+            ++context.message_idx;
+        }
+        break;
+    case "t":  // scrolling messages down i.e., to latest messages
+        if (context.message_idx > 0) { --context.message_idx; }
+        break;
+    case "b":  // delete current messages
+        context.messages.splice(context.message_idx, 1);
+        context.message_idx = Math.min(context.message_idx,
+                                       context.messages.length - 1);
+        break;
+    case "r":  // restart
+        if (false && context.currentScreen === context.gameOverScreen) {
+            context.showScreen("blank");
+            var container = document.getElementById("context");
+            document.body.removeChild(container);
+            setTimeout(function() {
+                context = null;
+                init();
+            }, 10);
+        }
+        break;
+    case "?":
+        if (context.currentScreen === context.helpScreen) {
+            context.showScreen("dungeon");
+        } else {
+            context.showScreen("help");
+        }
+        break;
+    default:
+        return true;
+    }
+    if (context.currentScreen === context.dungeonScreen) {
+        context.hero.regenerate();
+        context.refresh();
+    }
+    return false;
+};
+
+Context.prototype.getChar = function(event) {
+    if (event.which === null) {
+        return String.fromCharCode(event.keyCode);  // IE
+    } else if (event.which !== 0 && event.charCode !== 0) {
+        return String.fromCharCode(event.which);   // the rest
+    }
+};
+
+Context.prototype.town = function() {
+    if (this.hero.has_lozenge) {
+        this.victoryScreen.element.innerHTML = victoryText.format(this.hero.gold);
+        this.showScreen("victory");
+    } else {
+        this.showScreen("town");
+    }
+};
+
+function Dungeon(options) {
+    this.width = options.width;
+    this.height = options.height;
+    this.maxX = this.width - 1;
+    this.maxY = this.height - 1;
+    this.levels = [];
+    this.currentLevel = undefined;
+    this.levelIndex = undefined;
+    this.context = options.context;
+    this.hero = this.context.hero;
+}
+
+Dungeon.prototype.addLevel = function(start, parent) {
+    if (parent && ! this.parent) { this.parent = parent; }
+    if (! parent) { parent = this.parent; }
+    this.levels.push(new Level({width: this.width,
+                                height: this.height,
+                                level: this.levels.length + 1,
+                                start: start,
+                                dungeon: this,
+                                context: this.context}));
+    parent.appendChild(this.levels[this.levels.length - 1].element);
+    this.levels[this.levels.length - 1].generateLevel();
+    if (this.currentLevel === undefined) {
+        this.currentLevel = this.levels[0];
+        window.level = this.currentLevel;
+        this.levelIndex = 0;
+    }
+};
+
+var LEFT = 0, UP = 1, RIGHT = 2, DOWN = 3, X = 0, Y = 1;
+var N = 'i', NE = 'o', E = 'l', SE = '.', S = ',', SW = 'm', W = 'j', NW = 'u';
+Dungeon.prototype.move = function(direction) {
+    if (this.hero === undefined) { this.hero = this.context.hero; }
+    var new_position = {x: this.hero.square.x, y: this.hero.square.y};
+    allowed = false;
+    switch(direction) {
+    case N:
+        new_position.y -= 1;
+        break;
+    case NE:
+        new_position.x += 1;
+        new_position.y -= 1;
+        break;
+    case E:
+        new_position.x += 1;
+        break;
+    case SE:
+        new_position.x += 1;
+        new_position.y += 1;
+        break;
+    case S:
+        new_position.y += 1;
+        break;
+    case SW:
+        new_position.x -= 1;
+        new_position.y += 1;
+        break;
+    case W:
+        new_position.x -= 1;
+        break;
+    case NW:
+        new_position.x -= 1;
+        new_position.y -= 1;
+        break;
+    }
+    new_position = this.currentLevel.grid[new_position.x][new_position.y];
+    var can_move = false;
+    if (new_position.entity === wall) { return; }
+    else if (new_position.entity === floor ||
+             new_position.entity === up ||
+             new_position.entity === down ||
+             new_position.entity.classes.indexOf("item") > -1) {
+        can_move = true;
+    }
+    else if (new_position.entity.constructor === Mob) {
+        can_move = false;
+        this.attack(new_position);
+    }
+    if (can_move) {
+        this.hero.square.remove(this.hero);
+        this.hero.square = new_position;
+        this.hero.square.add(this.hero);
+        this.currentLevel.updateVisibility(this.hero.square);
+    }
+    this.checkMobs();
+    this.context.refresh();
+};
+var awareness = [
+    {x: -1, y: -1},
+    {x: 0,  y: -1},
+    {x: 1,  y: -1},
+    {x: -1, y: 0},
+    {x: 1,  y: 0},
+    {x: -1, y: 1},
+    {x: 0,  y: 1},
+    {x: 1,  y: 1},
+    {x: -2,  y: 0},
+    {x: 0, y: -2},
+    {x: 0, y: 2},
+    {x: 2, y: 0}
+];
+
+/**
+ * Check mob activity for movement or attacks
+ */
+Dungeon.prototype.checkMobs = function() {
+    if (context.currentScreen !== context.dungeonScreen) { return; }
+    awareness.forEach(function(d) {
+        var x = Math.min(Math.max(0, this.hero.square.x + d.x), this.maxX),
+            y = Math.min(Math.max(0, this.hero.square.y + d.y), this.maxY),
+            square = this.currentLevel.grid[x][y];
+        if (square.entity instanceof Mob) {
+            if (! square.entity.aware()) {
+                square.entity.aware(true);
+                square.entity.wait = true;
+            }
+        }
+    }, this);
+    this.currentLevel.mobs.forEach(function(mob) {
+        if (! mob.aware()) { return; }
+        if (mob.wait) { mob.wait = false; return; }
+        var dx = this.hero.square.x - mob.square.x,
+            dy = this.hero.square.y - mob.square.y,
+            nx = mob.square.x + Math.min(Math.max(dx, -1), 1),
+            ny = mob.square.y + Math.min(Math.max(dy, -1), 1);
+        if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {  // too far to attack, move
+            if (this.currentLevel.grid[nx][ny].isOpen()) {
+                if (random(0, 100) < 90) {   // small chance the mob falls behind
+                    mob.square.remove(mob);
+                    this.currentLevel.grid[nx][ny].add(mob);
+                }
+            } else {
+                if ([true, false].choice()) { mob.aware(false); }
+            }
+        } else {
+            this.defend(mob);
+        }
+    }, this);
+};
+
+/**
+ * The hero attacks a mob
+ *
+ * Damage done is weapon damage, less a random factor that's equal to a number
+ * within the range of 0 to half the weapon's damage, reduced by the number of
+ * kills for the hero divided by a factor, rounded up.
+ */
+Dungeon.prototype.attack = function(square) {
+    var mob = square.entity,
+        damage = this.hero.equipped.damage,
+        protection = mob.worn || mob.borne || {armor: 0},
+        randomness = random(0, damage / 2) - Math.ceil(this.hero.killed / 7),
+        actual = damage - randomness - protection.armor;
+    actual = actual < 0 ? 0 : actual;
+    mob.focused(true);
+    if ([true, false].choice()) {
+        context.add_message("You hit the {0} for {1} points of damage!"
+                            .format(mob.kind, actual));
+        mob.hp -= actual;
+        if (mob.hp <= 0) {
+            this.currentLevel.mobs.remove(mob);
+            context.add_message("You killed the {0}!".format(mob.kind));
+            this.hero.killed++;
+            square.remove(mob);
+            square.removeClass(["focused", "aware"]);
+            var item = new Pile();
+            item.contains.push(new Gold({amount: mob.gold}));
+            if ([true, false].choice() && mob.equipped) {
+                item.contains.push(mob.equipped);
+            }
+            if ([true, false].choice() && mob.worn) {
+                item.contains.push(mob.worn);
+            }
+            square.add(item);
+            return;
+        }
+    } else {
+        context.add_message("You miss the {0}.".format(mob.name));
+    }
+};
+
+/**
+ * A mob attacks the hero
+ */
+Dungeon.prototype.defend = function(attacker) {
+    var arm = attacker.equipped || attacker.has,
+        actual = arm.damage - random(0, arm.damage) - this.hero.worn.armor;
+    if ([true, false].choice() && actual > 0) {
+        context.add_message("The {0} hits you for {1} points of damage with a {2}!"
+                            .format(attacker.kind, actual, arm.kind));
+        this.hero.hp -= actual;
+        if (this.hero.hp <= 0) {
+            context.currentScreen = context.gameOverScreen;
+            context.gameOverScreen.element.innerHTML = gameOverText.format(
+                level.level, attacker.kind, this.hero.gold,
+                this.hero.equipped, this.hero.worn
+            );
+            context.dungeonScreen.element.style.display = "none";
+            context.currentScreen.element.style.display = "block";
+        }
+    } else {
+        context.add_message("The {0} misses you.".format(attacker.kind));
+    }
+};
+
+/**
+ * For whatever is on the same square as the hero use it however possible
+ */
+Dungeon.prototype.activate = function() {
+    var square = this.hero.square;
+    if (square.last() === up || square.last() === down) { this.exit(); }
+    if (square.last().constructor === Item) {
+        if (square.last().consumable && ! square.last().carryable) {
+            var items = square.last().contains.slice(),
+                found = false;
+            while (item = items.shift()) {  // jshint ignore:line
+                if ((item.armor || 0) > this.hero.worn.armor) {
+                    this.hero.worn = item;
+                    context.add_message("You found " + item.name + " armor!");
+                    found = true;
+                } else if ((item.damage || 0) > this.hero.equipped.damage) {
+                    this.hero.equipped = item;
+                    context.add_message("You found a " + item.name + "!");
+                    context.print_status();
+                    found = true;
+                } else if (item.name === "Gold" && item.amount > 0) {
+                    this.hero.gold += item.amount;
+                    context.add_message("You found " + item.amount + " gold!");
+                    found = true;
+                } else if (item.name === "Chest" || item.name === "Pile") {
+                    items.concat(item.contains);
+                }
+                context.print_status();
+            }
+            if (! found) {
+                context.add_message(square.last().name + " was empty");
+            }
+            square._previous.shift();
+        } else if (square.last().consumable && square.last().carryable) {
+            if (square.last() instanceof Lozenge) {
+                this.hero.inventory.push(square._previous.shift());
+                this.hero.has_lozenge = true;
+                context.showScreen("lozenge");
+            }
+        }
+    }
+};
+
+/**
+ * Leave the dungeon by staircase
+ */
+Dungeon.prototype.exit = function() {
+    var loc = "entry";
+    if (this.hero.square.x === this.currentLevel.entry.x &&
+        this.hero.square.y === this.currentLevel.entry.y) {
+        --this.levelIndex;
+        if (this.levelIndex >= 0) { this.hero.square.remove(this.hero); }
+        loc = "exit";
+    } else if (this.hero.square.x === this.currentLevel.exit.x &&
+               this.hero.square.y === this.currentLevel.exit.y) {
+        if (this.levelIndex == this.levels.length - 1) {
+            this.addLevel({x: this.hero.square.x, y: this.hero.square.y});
+        }
+        ++this.levelIndex;
+        this.hero.square.remove(this.hero);
+    } else {
+        return;
+    }
+    // reset mob focus and awareness
+    this.currentLevel.resetMobs(true);
+    if (this.levelIndex < 0) {
+        this.context.town();
+        return;
+    }
+    this.currentLevel = this.levels[this.levelIndex];
+    window.level = this.currentLevel;
+    if (level.level > this.hero.level) {
+        this.hero.level++;
+        var increase = random(5, 10);
+        this.hero.hp += increase;
+        this.hero.max_hp += increase;
+    }
+    for (var ii = 0; ii < this.levels.length; ++ii) {
+        if (ii === this.levelIndex) { continue; }
+        this.levels[ii].element.style.display = "none";
+    }
+    this.currentLevel.element.style.display = "block";
+    this.hero.square = this.currentLevel.grid[this.currentLevel[loc].x]
+                                             [this.currentLevel[loc].y];
+    this.hero.square.add(this.hero);
+    this.currentLevel.updateVisibility(this.hero.square);
+};
+
+
+function Mob(properties, options) {
+    this.html = '';
+    this.classes = ['mob'];
+    this.hp = 0;
+    this.inventory = [];
+    this.equipped = undefined;
+    this.worn = undefined;
+    this.gold = 0;
+    this.level = 1;
+    this.square = undefined;
+    this._aware = false;
+    this._focused = false;
+
+    properties = properties || {};
+    options = options || {};
+    for (var attr in properties) { this[attr] = properties[attr]; }
+    for (var opt in options) { this[opt] = options[opt]; }
+
+    this.setup = function() {
+        for (var ii = 0; ii < this.level; ++ii) {
+            this.hp += random(5, 10);
+            this.gold += random(0, 10);
+        }
+        this.max_hp = this.hp;
+        ["equipped", "has", "worn", "borne"].forEach(function(property) {
+            if (this[property] instanceof Array) {
+                var choice = this[property].choice();
+                this[property] = new window[choice]({level: this.level});
+            }
+        }, this);
+    };
+
+}
+
+/**
+ * Focus means the mob is focused on killing the hero.  Focus is only reset
+ * when the hero leaves the level.
+ */
+Mob.prototype.focused = function(set) {
+    if (set !== undefined) {
+        this._focused = !! set;
+        this._aware = !! set;
+        if (this._focused) {
+            this.square.addClass(["focused"]);
+            this.square.removeClass(["aware"]);
+        }
+        else { this.square.removeClass(["focused"]); }
+    }
+    return this._focused;
+};
+
+/**
+ * Awareness means the mob is weakly focused on killing the hero.  If the mob
+ * is focused, the mob is aware and its awareness is not reset; if the mob is
+ * not focused, awareness is reset by the hero running away.
+ */
+Mob.prototype.aware = function(set) {
+    if (set !== undefined && ! this._focused) {
+        this._aware = !! set;
+        if (this._aware) { this.square.addClass("aware"); }
+        else { this.square.removeClass("aware"); }
+    }
+    return this._aware;
+};
+
+Mob.prototype.reset = function(resetFocus) {
+    if (resetFocus !== undefined) { this._focused = !! resetFocus; }
+    this.aware(false);
+};
+
+function Item(properties, options) {
+    this.html = '';
+    this.classes = ['item'];
+    this.contains = [];
+    this.consumable = false;
+    this.carryable = true;
+    this.level = 1;
+
+    properties = properties || {};
+    options = options || {};
+    for (var attr in properties) { this[attr] = properties[attr]; }
+    for (var opt in options) { this[opt] = options[opt]; }
+
+    this.setup = function() {
+        if (this.damage) {
+            this.damage = (this.damage - random(0, this.damage / 2)) * this.level;
+        }
+        if (this.armor) {
+            this.armor = (this.armor - random(0, this.armor / 2)) * this.level;
+        }
+        if (this.name && (this.damage || this.armor)) {
+            this.name = "{0} ({1})".format(this.name, (this.damage || this.armor));
+        }
+    };
+}
+
+var mobs  = {
+        Bard:     {html: '\u266a',
+                   equipped: ["Dagger", "Sword"],
+                   worn: ["Tunic", "Leather"]},
+        Snake:    {html: '\u2621', has: ["Fang"]},
+        Skull:    {html: '\u2620', has: ["Tooth"], borne: ["Bone"]},
+        Bishop:   {html: '\u2657',
+                   equipped: ["Mitre", "Dagger"],
+                   worn: ["Tunic"]},
+        Dwarf:    {html: '\u2692',
+                   equipped: ["Pick", "Sword"],
+                   worn: ["Studded", "Scale", "Chain", "Plate"]},
+        Cuberoot: {html: '\u221b', equipped: ["Modulo"],
+                   borne: ["Indivisibility"]},
+        Empty:    {html: '\u2205', has: ["Void"], borne: ["Haze"]}
+    },
+    hero = {html: 'I', },
+
+    items = {
+        Dagger:  {damage: 4},
+        Sword:   {damage: 8},
+        Mitre:   {damage: 10},
+        Fang:    {damage: 3},
+        Bong:    {damage: 5},
+        Pick:    {damage: 7},
+        Void:    {damage: 12},
+        Modulo:  {damage: 8},
+        Tooth:   {damage: 1},
+
+        Tunic:          {armor: 1},
+        Leather:        {armor: 2},
+        Bone:           {armor: 2},
+        Studded:        {armor: 3},
+        Haze:           {armor: 3},
+        Scale:          {armor: 4},
+        Chain:          {armor: 5},
+        Plate:          {armor: 8},
+        Indivisibility: {armor: 4},
+
+        Gold:    {amount: 0},
+
+        Chest:   {html: '\u2709', consumable: true, carryable: false},
+        Pile:    {html: '\u2234', consumable: true, carryable: false}
+    },
+
+    lozenge = {html: '\u22c4', consumable: true, carryable: true,
+               classes: ["item", "treasure"]},
+
+    wall  = {html: ' ', classes: ['wall']},
+    floor = {html: '\u203b', classes: ['floor']},
+    up    = {html: '\u2191', classes: ['stairs']},
+    down  = {html: '\u2193', classes: ['stairs']},
+
+    none = null
+;
+
+/**
+ * Create a class of each mob described above
+ */
+function makeClass(Prototype, type, properties) {
+    window[type] = function(options) {
+        Prototype.call(this, properties, options);
+        this.kind = type.toLowerCase();
+        this.name = type;
+        this.classes.push(type.toLowerCase());
+        if (this.setup) { this.setup(); }
+    };
+    window[type].prototype = new Prototype();
+    window[type].constructor = window[type];
+}
+
+for (var type in items) { makeClass(Item, type, items[type]); }
+for (var type in mobs) { makeClass(Mob, type, mobs[type]); }
+makeClass(Mob, "Hero", hero);
+makeClass(Item, "Lozenge", lozenge);
+
+/**
+ * Return a random integer within min/max bounds; if not specified, min
+ * defaults to 0 and max defaults to the length of the array.
+ */
+Array.prototype.random = function(min, max) {
+    min = min || 0;
+    max = max || this.length;
+    return Math.floor(Math.random() * (max - min) + min);
+};
+
+function random(min, max) {
+    min = Math.floor(min || 0);
+    max = Math.ceil(max || 100);
+    return Math.floor(Math.random() * (max - min) + min);
+}
+
+/**
+ * Return a random element from the array
+ */
+Array.prototype.choice = function() { return this[this.random()]; };
+
+/**
+ * Remove the item if found, return boolean indicating actual removal.
+ */
+Array.prototype.remove = function(item) {
+    if ((ii = this.indexOf(item)) > -1) { return !! this.splice(ii, 1); }
+    return false;
+};
+
+/**
+ * Remove and return a random element, or undefined from an empty array.
+ */
+Array.prototype.draw = function() {
+    return this.splice(this.random(), 1)[0];
+};
+
+/**
+ * Return the last element of the array
+ */
+Array.prototype.last = function() { return this[this.length - 1]; };
+
+
+/**
+ * Return the string padded with spaces on the left to the specified length;
+ * truncates the string to the specified length from the right if necessary
+ */
+var spaces = "                                        ";
+String.prototype.lpad = function(length, classes) {
+    var string = (spaces + (this || "")).slice(0 - length);
+    string = "<span class='" + (classes || "") + "'>" + string + "</span>";
+    return string;
+};
+
+/**
+ * Return the string padded with spaces on the right to the specified length;
+ * truncates the string to the specified length from the left if necessary
+ */
+String.prototype.rpad = function(length, classes) {
+    var string = ((this || "") + spaces).slice(0, length);
+    string = "<span class='" + (classes || "") + "'>" + string + "</span>";
+    return string;
+};
+
+String.prototype.format = function() {
+    var args = arguments;
+    return this.replace(/{(\d+)}/g, function(match, number) {
+        return typeof args[number] !== undefined ? args[number] : match;
+    });
+};
+
+/**
+ * Return the object's name attribute if it has one, standard string otherwise
+ */
+Object.prototype.toString = function() { return this.name || "[object Object]"; };
+
+
+function Screen(options) {
+    this.height = options.height;
+    this.width = options.width;
+    this.id = options.id;
+    this.element = document.createElement("div");
+    this.element.setAttribute("id", this.id);
+    this.element.className = "screen";
+    if (options.content) {
+        this.element.innerHTML = options.content;
+    }
+}
+
+
+var context = null,
+    config = {
+        // dungeon parameters
+        height: 25,
+        width: 50,
+        lozenge_level: 10,
+        initial_visibility: 0,
+        weapon: "Sword",
+        armor: "Scale",
+
+        // room generation
+        max_attempts: 60,
+        max_rooms: 15,
+        max_mobs: 10,
+        max_items: 5,
+
+        element: document.createElement("div")
+    };
+function init() {
+    context = new Context(config);
+    var node = document.createElement("div");
+    node.setAttribute("id", "context");
+    document.body.insertBefore(node, document.body.firstChild);
+    node.appendChild(context.element);
+    document.onkeypress = context.handleInput;
+    context.add_message("Initialization complete!");
+    context.refresh();
+}
+
+var helpText = "\n" +
+    "    \n" +
+    "    Crawl the dungeon the find the lozenge of power!  It looks like this:" +
+    " <span class='item treasure'>\u22c4</span>\n" +
+    "    \n" +
+    "    To move in eight directions:\n" +
+    "      <strong>u</strong>  <strong>i</strong>  <strong>o</strong>\n" +
+    "      <strong>j</strong>     <strong>l</strong>\n" +
+    "      <strong>m</strong>  <strong>,</strong>  <strong>.</strong>\n" +
+    "    \n" +
+    "    To attack, stand next to a monster and move into its square!\n" +
+    "    \n" +
+    "    Chests (<span class='item'>\u2709</span>) and Piles" +
+    " (<span class='item'>\u2234</span>) hold gold or better equipment!\n" +
+    "    \n" +
+    "    To use whatever you're on: <strong>k</strong>!\n" +
+    "    \n" +
+    "    Stairs up (<span class='stairs'>\u2191</span>) and down (<span " +
+    "class='stairs'>\u2193</span>) carry you between levels!\n" +
+    "    \n" +
+    "    Messages:\n" +
+    "      <strong>t</strong>  To scroll down\n" +
+    "      <strong>g</strong>  To scroll up\n" +
+    "      <strong>b</strong>  To delete the current message\n" +
+    "    \n" +
+    "    <strong>?</strong>  To go back to the dungeon\n" +
+    "\n",
+
+    gameOverText = "\n" +
+    "    \n" +
+    "    You died on level {0}, killed by a {1}.\n" +
+    "    \n" +
+    "    You had {2} gold, a {3}, and {4} armor.\n" +
+    "    \n" +
+    "    Reload the page to start over.\n" +
+    "    \n" +
+    "    The lozenge of power is still down there...\n" +
+    "\n",
+
+    lozengeText = "\n" +
+    "    \n" +
+    "    You found the lozenge of power!  Your nagging cough will soon be " +
+    "vanquished...\n" +
+    "    \n" +
+    "    if you make it back to town.\n" +
+    "    \n" +
+    "    Hit <strong>k</strong> to continue.\n" +
+    "\n",
+
+    victoryText = "\n" +
+    "    \n" +
+    "    You found the lozenge of power, and brought it back to civilization!\n" +
+    "    \n" +
+    "    And made {0} gold along the way.\n" +
+    "    \n" +
+    "    Reload the page to try again.\n" +
+    "\n",
+
+    townText = "\n" +
+    "    \n" +
+    "    This is where the town would go if one existed.\n" +
+    "    \n" +
+    "    Hit <strong>k</strong> to return to the dungeon.\n" +
+    "\n";
+function Level(options) {
+    this.width = options.width;
+    this.height = options.height;
+    this.level = options.level;
+    this.start = options.start;
+    this.dungeon = options.dungeon;
+    this.element = document.createElement("div");
+    this.grid = [];
+    this.available = {};
+    this.open = [];
+    this.mobs = [];
+    this.items = [];
+
+    var xx, yy, row;
+    for (yy = 0; yy < this.height; ++yy) {
+        row = document.createElement("div");
+        row.className = "row";
+        for (xx = 0; xx < this.width; ++xx) {
+            if (! this.grid[xx]) { this.grid[xx] = []; }
+            this.grid[xx].push(new Square({x: xx, y: yy, level: this}));
+            row.appendChild(this.grid[xx][yy].span());
+        }
+        this.element.appendChild(row);
+    }
+    // Give each square a cardinal direction reference to its neighbours
+    for (xx = 0; xx < this.width; ++xx) {
+        for (yy = 0; yy < this.height; ++yy) {
+            for (var dir in Square.prototype.cardinals) {
+                try {
+                    var nx = xx + Square.prototype.cardinals[dir][0],
+                        ny = yy + Square.prototype.cardinals[dir][1];
+                    this.grid[xx][yy][dir] = this.grid[nx][ny];
+                } catch(err) { this.grid[xx][yy][dir] = undefined; }
+            }
+        }
+    }
+}
+
+/**
+ */
+Level.prototype.random = function(min, max) {
+    return Math.floor(Math.random() * (max - min) + min);
+};
+
+Level.prototype.choice = function() {
+    return arguments[this.random(0, arguments.length)];
+};
+
+Level.prototype.getRoomParameters = function(door) {
+    var direction = this.choice("n", "w", "e", "s"),
+        a = {min: this.random(2, 3), max: this.random(3, 8)},
+        b = {min: this.random(2, 4), max: this.random(4, 12)},
+        ew = (door && door.x < this.width / 2) ? "e" : "w",
+        ns = (door && door.y < this.height / 2) ? "s" : "n";
+    if (door) {  // starting room, have to choose best direction
+        var cx = door.x / this.width,
+            cy = door.y / this.height;
+        cx = door.x > this.width / 2 ? 1 - cx : cx;
+        cy = door.y > this.height / 2 ? 1 - cy : cy;
+        direction = cx < cy ? ew : ns;
+        //console.log("{0} {1} {2} {3} {4}".format(door.x, door.y, cx, cy, direction));
+    }
+    if (direction === "n" || direction === "s") {
+        return {dir: direction, lat: b, lng: a};
+    }
+    return {dir: direction, lat: a, lng: b};
+};
+
+Level.prototype.generateLevel = function() {
+    this.entry = this.grid[this.start.x][this.start.y];
+    var params = this.getRoomParameters(this.entry),
+        num_rooms = 1,
+        mob, item, loc, xy;
+    this.addRoom(this.entry, params.dir, params.lat, params.lng);
+    for (var ii = 0; ii < config.max_attempts &&
+                     num_rooms < config.max_rooms; ++ii) {
+        var keys = Object.keys(this.available),
+            available = this.available[keys.choice()],
+            door = available.wall,
+            dir = available.dir;
+        params = this.getRoomParameters();
+        if (this.addRoom(door, dir, params.lat, params.lng)) { ++num_rooms; }
+    }
+
+    // add entry and exit
+    this.entry = this.grid[this.entry.x][this.entry.y];
+    this.entry.add(up);
+    this.open.remove(this.entry.id());
+    this.exit = this.choice.apply(this, this.open).split(",");
+    this.exit = this.grid[this.exit[0]][this.exit[1]];
+    this.exit.add(down);
+
+    // add mobs
+    for (var kk = 0; kk < config.max_mobs; ++kk) {
+        mob = this.generateMob();
+        xy = this.open.draw().split(",");
+        this.mobs.push(mob);
+        this.grid[xy[0]][xy[1]].add(mob);
+    }
+
+    // add items
+    for (var ll = 0; ll < config.max_items; ++ll) {
+        item = this.generateItem(["Chest", "Pile"].choice());
+        xy = this.open.draw().split(",");
+        this.items.push(item);
+        this.grid[xy[0]][xy[1]].add(item);
+    }
+
+    if (this.level === config.lozenge_level) {
+        item = new Lozenge();
+        xy = this.open.draw().split(",");
+        this.grid[xy[0]][xy[1]].add(item);
+    }
+};
+
+Level.prototype.generateMob = function() {
+    var type = Object.keys(mobs).choice(),
+        mob = new window[type]({level: this.level});
+    return mob;
+};
+
+Level.prototype.generateItem = function() {
+    var type = arguments[0] || Object.keys(items).choice(),
+        item = new window[type]();
+    if (item.consumable && ! item.carryable) {  // chest or pile
+        if ([true, false, item.name === "Chest", item.name === "Chest"].choice()) {
+            var gold = new Gold({amount: this.random(0, 10) * this.level });
+            if (gold.amount > 0) { item.contains.push(gold); }
+        }
+        if ([true, false, item.name === "Chest"].choice()) {
+            var obj = this.generateItem();
+            if (obj !== Gold) { item.contains.push(obj); }
+        }
+    }
+    return item;
+};
+
+Level.prototype.addRoom = function(door, dir, lat, lng) {
+    /**
+     * The meat of dungeon generation: this algorithm finds an available wall,
+     * adds a door to it, then tries to carve out a room at least min height
+     * and width and at most max height and width.  The direction in which the
+     * carver is facing (i.e., in which wall of the existing room the door is)
+     * is the longitudinal axis of the new room (lng* variables, below; lat*
+     * are lateral equivalents).  The carver digs laterally to max_lat,
+     * randomly alternating between left and right for the first row, and then
+     * advances along the longitudinal axis and and carves laterally to the
+     * left/right boundaries established in the first row.
+     *
+     * If at any time, the carver cannot continue because the possible square
+     * doesn't have wall in the next square laterally and longitudinally, room
+     * generation stops and min_* values are checked.  If the room is big
+     * enough, it's committed; otherwise it's abandoned.
+     */
+
+    var lat_choices = (dir === "n" || dir === "s" ? ["w", "e"] : ["n", "s"]),
+        choices = lat_choices.slice(),
+        lng_choices = (dir === "n" || dir === "s" ? ["n", "s"] : ["w", "e"]),
+        lng_axis = (dir === "n" || dir === "s" ? "y" : "x"),
+        lat_axis = (dir === "n" || dir === "s" ? "x" : "y"),
+        dz = (dir === "n" || dir === "w" ? -1 : 1),
+        rdir = Square.prototype.reverse[dir],
+        ldir = lat_choices[Number(dz === 1)],
+        nw = dir + ldir,
+        se = dir + lat_choices[Number(dz === -1)],
+        room = {};
+    for (ii = 0; ii < lat_choices.length; ++ii) {
+        room[lat_choices[ii]] = door[dir];
+        room[lng_choices[ii]] = door[dir];
+        room[nw] = door[dir];
+        room[se] = door[dir];
+    }
+
+    for (ii = 0; ii < lat.max - 1 && choices.length > 0; ++ii) {
+        var cdir = choices.choice(),
+            latp = room[cdir][cdir],
+            cpdir = ["n", "s"].indexOf(dir) > -1 ? dir + cdir : cdir + dir;
+        if (latp.isOkForRoom(dir, cdir, rdir, cpdir)) {
+            room[cdir] = latp;
+            room[dir + cdir] = latp;
+        } else {
+            if ((ii = choices.indexOf(cdir)) > -1) { choices.splice(ii, 1); }
+        }
+    }
+    var width = room[lat_choices[1]][lat_axis] - room[lat_choices[0]][lat_axis];
+    if (width + 1 < lat.min) { return false; }
+    loop: for (kk = 1; kk < lng.max; ++kk) {
+        var cdir = lat_choices[1],   // jshint ignore:line
+            dirs = [dir, cdir];
+        if (room[lat_choices[0]][dir].isOkForRoom(dir, cdir, lat_choices[0])) {
+            if (["n", "s"].indexOf(dir) > -1) {
+                dirs.push(dir + lat_choices[0]);
+                dirs.push(dir + lat_choices[1]);
+            } else {
+                dirs.push(lat_choices[0] + dir);
+                dirs.push(lat_choices[1] + dir);
+            }
+            var xdir = ["n", "s"].indexOf(dir) > -1 ? dir + cdir : cdir + dir;
+            room[cdir] = room[lat_choices[0]] = room[lat_choices[0]][dir];
+            for (ii = 0; ii < width; ++ii) {
+                if (! room[cdir][cdir].isOkForRoom.apply(dirs)) {
+                    break loop;
+                }
+                room[cdir] = room[cdir][cdir];
+            }
+            room[nw] = room[ldir];
+        }
+    }
+    if (room[nw][lat_axis] > room[se][lat_axis]) {
+        room.tmp = room[nw];
+        room[nw] = room[se];
+        room[se] = room.tmp;
+    }
+    var height = room[se][lng_axis] - room[nw][lng_axis];
+    if (height + 1 < lng.min) { return false; }
+    for (xx = room[nw].x; xx <= room[se].x; ++xx) {
+        for (yy = room[nw].y; yy <= room[se].y; ++yy) {
+            this.grid[xx][yy].add(floor);
+            this.open.push(xx + "," + yy);
+        }
+    }
+    this.grid[door.x][door.y].add(floor);
+
+    // update available walls
+    for (xx = room[nw].x; xx <= room[se].x; ++xx) {
+        this.grid[xx][room[nw].y].markAvailableWalls("n");
+        this.grid[xx][room[se].y].markAvailableWalls("s");
+    }
+    for (yy = room[nw].y; yy <= room[se].y; ++yy) {
+        this.grid[room[nw].x][yy].markAvailableWalls("w");
+        this.grid[room[se].x][yy].markAvailableWalls("e");
+    }
+
+    return true;
+};
+
+var visibility_grid = [
+    [[1, 2], [2], [1, 2]],
+    [[2], [], [2]],
+    [[1, 2], [2], [1, 2]],
+];
+Level.prototype.updateVisibility = function(square) {
+    var x = square.x, y = square.y;
+    for (var yy = -1; yy <= 1; ++yy) {
+        for (var xx = -1; xx <= 1; ++xx) {
+            if (! this.grid[x + xx]) { continue; }
+            if (! this.grid[x + xx][y + yy]) { continue; }
+            this.grid[x + xx][y + yy].updateVisibility(3);
+            if (this.grid[x + xx][y + yy].entity != wall) {
+                var xtd = visibility_grid[xx + 1][yy + 1];
+                this.grid[x + xx + xx][y + yy + yy].updateVisibility(xtd[0]);
+                if (xtd.length > 1) {
+                    this.grid[x + xx + xx][y + yy].updateVisibility(xtd[1]);
+                    this.grid[x + xx][y + yy + yy].updateVisibility(xtd[1]);
+                }
+            }
+        }
+    }
+};
+
+Level.prototype.resetMobs = function(resetFocus) {
+    this.mobs.forEach(function(mob) { mob.reset(resetFocus); });
+};
+
+
+
+
+function Square(options) {
+    this.x = options.x;
+    this.y = options.y;
+    this.visibility = config.initial_visibility;
+    this.entity = options.entity || wall;
+    this.level = options.level;
+    this._span = undefined;
+    this._classes = ['grid'].concat(this.entity.classes || []);
+    this._previous = [];
+}
+
+Square.prototype.add = function(entity) {
+    this._previous.unshift(this.entity);
+    this.entity.classes.forEach(function(cls) { this.removeClass(cls); }, this);
+    this.entity = entity;
+    if (this.entity instanceof Mob) {
+        if (this.entity.aware()) { this.addClass("aware"); }
+        if (this.entity.focused()) {
+            this.removeClass("aware");
+            this.addClass("focused");
+        }
+    }
+    this.entity.square = this;
+    this.entity.classes.forEach(function(cls) { this.addClass(cls); }, this);
+    this.span().innerHTML = entity.html;
+};
+
+Square.prototype.last = function() {
+    return this._previous[0];
+};
+
+Square.prototype.remove = function(entity) {
+    this.entity.classes.forEach(function(cls) { this.removeClass(cls); }, this);
+    if (this.entity instanceof Mob) {
+        this.entity.square = undefined;
+        this.removeClass(["focused", "aware"]);
+    }
+    this.entity = this._previous.shift();
+    this.entity.classes.forEach(function(cls) { this.addClass(cls); }, this);
+    this.span().innerHTML = this.entity.html;
+};
+
+Square.prototype.cardinals = {"nw": [-1, -1], "n": [0, -1], "ne": [1, -1],
+                              "e": [1, 0], "se": [1, 1], "s": [0, 1],
+                              "sw": [-1, 1], "w": [-1, 0]};
+Square.prototype.reverse = {"nw": "se", "n": "s", "ne": "sw", "e": "w",
+                            "se": "nw", "s": "n", "sw": "ne", "w": "e"};
+Square.prototype.lighting = ["pitch", "dark", "dim", "visible"];
+
+Square.prototype.span = function() {
+    if (this._span === undefined) {
+        this._span = document.createElement("span");
+        this._span.setAttribute("id", this.x + "," + this.y);
+        this._span.innerHTML = this.entity.html;
+        this._classes.push(this.lighting[this.visibility]);
+        this._span.className = this._classes.join(" ");
+    }
+    return this._span;
+};
+
+Square.prototype.updateVisibility = function(level) {
+    if (level > this.visibility) {
+        this.removeClass(this.lighting[this.visibility]);
+        this.visibility = level;
+        this.addClass(this.lighting[this.visibility]);
+    }
+};
+
+Square.prototype.addClass = function(cls) {
+    if (! (cls instanceof Array)) { cls = [cls]; }
+    for (var ii = 0; ii < cls.length; ++ii) {
+        if (this._classes.indexOf(cls[ii]) === -1) {
+            this._classes.push(cls[ii]);
+        }
+    }
+    this.span().className = this._classes.join(" ");
+};
+
+Square.prototype.removeClass = function(cls) {
+    if (! (cls instanceof Array)) { cls = [cls]; }
+    for (var ii = 0; ii < cls.length; ++ii) {
+        if ((jj = this._classes.indexOf(cls[ii])) > -1) {
+            this._classes.splice(jj, 1);
+        }
+    }
+    this.span().className = this._classes.join(" ");
+};
+
+Square.prototype.getOpenAdjacent = function() {
+    var adj = [];
+    if (this.n && this.n.entity != wall) {
+        adj.push({x: this.n.x, y: this.n.y, dir: "n"});
+    }
+    if (this.e && this.e.entity != wall) {
+        adj.push({x: this.e.x, y: this.e.y, dir: "e"});
+    }
+    if (this.s && this.s.entity != wall) {
+        adj.push({x: this.s.x, y: this.s.y, dir: "s"});
+    }
+    if (this.w && this.w.entity != wall) {
+        adj.push({x: this.w.x, y: this.w.y, dir: "w"});
+    }
+    return adj;
+};
+
+Square.prototype.isOkForRoom = function() {
+    for (var ii = 0; ii < arguments.length; ++ii) {
+        if (! this[arguments[ii]] || this[arguments[ii]].entity !== wall) {
+            return false;
+        }
+    }
+    return true;
+};
+
+Square.prototype.markAvailableWalls = function(dir) {
+    var contender = this[dir],
+        cursor = this[dir],
+        id = contender.span().getAttribute("id"),
+        dz, l, r;
+    if (dir === "n") { dz = -1; l = "w"; r = "e"; }
+    else if (dir === "s") { dz = 1; l = "e"; r = "w"; }
+    else if (dir === "w") { dz = -1; l = "s"; r = "n"; }
+    else { dz = 1; l = "n"; r = "s"; }
+    for (var ii = 0; ii < 3 && contender && cursor; ++ii) {
+        if (! (cursor && cursor.entity === wall &&
+               cursor[l] && cursor[l].entity === wall &&
+               cursor[r] && cursor[r].entity === wall &&
+               cursor[dir])) {
+            //contender.removeClass("available");
+            delete this.level.available[id];
+            return false;
+        }
+        cursor = cursor[dir];
+    }
+    this.level.available[id] = {wall: contender, dir: dir};
+    //contender.addClass("available");
+    return true;
+};
+
+Square.prototype.isOpen = function() {
+    return (this.entity === floor ||
+            this.entity instanceof Item ||
+            this.entity === up ||
+            this.entity === down);
+};
+
+Square.prototype.id = function() { return this.x + "," + this.y; };
+
+
+
+init();
+</script>
+</body>
+</html>

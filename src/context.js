@@ -1,3 +1,8 @@
+var Context = (function() {
+    return {
+    };
+}());
+
 function Context(options) {
     this.element = options.element;
     this.height = options.height;
