@@ -175,6 +175,9 @@ var context = null,
         max_items: 5,
     };
 
+var LEFT = 0, UP = 1, RIGHT = 2, DOWN = 3, X = 0, Y = 1;
+var N = 'i', NE = 'o', E = 'l', SE = '.', S = ',', SW = 'm', W = 'j', NW = 'u';
+
 function init() {
     context = new Context(config);
     document.body.insertBefore(context.element, document.body.firstChild);
